@@ -341,7 +341,7 @@
       </div>
     </div>
     <aside class="controls" aria-label="Practice settings">
-      <PracticeSelect label="Keyboard layout" items={layoutOptions} value={layoutName}
+      <PracticeSelect label="Keyboard layout" items={layoutOptions} value={layoutName} optionsClass="layout-select-options"
         change={(value) => { layoutName = value; reset() }} />
 
       <nav aria-label="Lessons">
