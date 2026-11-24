@@ -15,6 +15,7 @@
   import {
     codes,
     createPromptGenerator,
+    isLetterFocused,
     keyRows,
     layouts,
     lessonKeys,
@@ -25,6 +26,7 @@
     validateLayout,
     type Layout,
     type LetterHistory,
+    type LetterFocusOverrides,
   } from './practice'
 
   const lessons = [
@@ -68,6 +70,7 @@
   const practiceStorageKey = 'learn-colemak:missed-letters:v1'
   let practiceMissedLetters = $state(false)
   let letterHistories = $state<Record<string, LetterHistory>>({})
+  let focusOverrides = $state<Record<string, LetterFocusOverrides>>({})
   let historyDirty = false
 
   function saveLetterHistory() {
@@ -76,7 +79,11 @@
     try {
       localStorage.setItem(
         practiceStorageKey,
-        JSON.stringify({ enabled: practiceMissedLetters, layouts: letterHistories }),
+        JSON.stringify({
+          enabled: practiceMissedLetters,
+          layouts: letterHistories,
+          focusOverrides,
+        }),
       )
     } catch {
       // Keep using the in-memory history when storage is unavailable.
@@ -94,7 +101,46 @@
     return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : undefined
   })
   let letterBreakdownOpen = $state(false)
+  let activeFocusOverrides = $derived(focusOverrides[historyKey] ?? {})
+  let focusChoices = $derived(
+    [
+      ...new Set(
+        [...layout.base.join(''), ...layout.shift.join('')]
+          .filter(key => /^\p{L}$/u.test(key))
+          .map(key => key.toLowerCase()),
+      ),
+    ].sort((a, b) => a.localeCompare(b)),
+  )
+
+  function changeFocusLetters(letters: string[], checked: boolean) {
+    focusOverrides[historyKey] = {
+      ...activeFocusOverrides,
+      ...Object.fromEntries(letters.map(letter => [letter, checked])),
+    }
+    historyDirty = true
+    saveLetterHistory()
+    if (practiceMissedLetters) reset()
+  }
+
   let letterBreakdown = $derived(summarizeLetterHistory(activeLetterHistory ?? {}))
+
+  let letterRows = $derived.by(() => {
+    const recorded = new Set(letterBreakdown.map(({ letter }) => letter))
+    return [
+      ...letterBreakdown,
+      ...focusChoices
+        .filter(letter => !recorded.has(letter))
+        .map(letter => ({ letter, attempts: 0, misses: 0, missRate: 0 })),
+    ]
+  })
+
+  let focusedCount = $derived(
+    letterRows.filter(({ letter, misses }) => isLetterFocused(letter, misses, activeFocusOverrides))
+      .length,
+  )
+  let allFocusChecked = $derived<boolean | 'indeterminate'>(
+    focusedCount > 0 && (focusedCount === letterRows.length ? true : 'indeterminate'),
+  )
 
   function resetLetterHistory() {
     if (!window.confirm(`Clear missed-letter history for ${layoutName}?`)) return
@@ -236,6 +282,39 @@
     try {
       const saved = JSON.parse(localStorage.getItem(practiceStorageKey) ?? 'null')
       practiceMissedLetters = saved?.enabled === true
+      if (saved?.focusOverrides && typeof saved.focusOverrides === 'object') {
+        focusOverrides = Object.fromEntries(
+          Object.entries(saved.focusOverrides).flatMap(([key, value]) =>
+            value && typeof value === 'object'
+              ? [
+                  [
+                    key,
+                    Object.fromEntries(
+                      Object.entries(value).filter(([, checked]) => typeof checked === 'boolean'),
+                    ),
+                  ],
+                ]
+              : [],
+          ),
+        )
+      } else if (saved?.focusExclusions && typeof saved.focusExclusions === 'object') {
+        focusOverrides = Object.fromEntries(
+          Object.entries(saved.focusExclusions).flatMap(([key, letters]) =>
+            Array.isArray(letters)
+              ? [
+                  [
+                    key,
+                    Object.fromEntries(
+                      letters
+                        .filter(letter => typeof letter === 'string')
+                        .map(letter => [letter, false]),
+                    ),
+                  ],
+                ]
+              : [],
+          ),
+        )
+      }
       if (saved?.layouts && typeof saved.layouts === 'object' && !Array.isArray(saved.layouts)) {
         letterHistories = saved.layouts
       }
@@ -285,6 +364,7 @@
       caps,
       punctuation,
       practiceMissedLetters ? activeLetterHistory : undefined,
+      activeFocusOverrides,
     )
     prompt = nextWords(mode === 'words' ? wordLimit : 48)
     wordIndex = 0
@@ -750,33 +830,56 @@
             </DialogTrigger>
             <DialogBackdrop class="letter-breakdown-backdrop" />
             <DialogContent class="letter-breakdown">
-              <DialogTitle>Missed letter breakdown</DialogTitle>
+              <DialogTitle>Missed letter practice</DialogTitle>
               <DialogDescription>{layoutName} · Last 24 attempts per letter</DialogDescription>
-              {#if letterBreakdown.length}
+              <p>
+                By default, letters with two or more recent misses get a boost. Check or uncheck
+                letters to override.
+              </p>
+              {#if letterRows.length}
                 <table aria-label="Missed letters for {layoutName}">
                   <thead>
                     <tr>
+                      <th scope="col">
+                        <Checkbox
+                          aria-label="Select all focus letters"
+                          checked={allFocusChecked}
+                          onCheckedChange={value =>
+                            changeFocusLetters(
+                              letterRows.map(({ letter }) => letter),
+                              value === true,
+                            )}><CheckboxIndicator aria-hidden="true" /></Checkbox
+                        >
+                      </th>
                       <th scope="col">Letter</th>
-                      <th scope="col">Miss rate</th>
+                      <th scope="col" class="miss-rate-column">Miss rate</th>
                       <th scope="col">Missed</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {#each letterBreakdown as { letter, attempts, misses, missRate } (letter)}
+                    {#each letterRows as { letter, attempts, misses, missRate } (letter)}
                       <tr>
+                        <td class="focus-cell">
+                          <Checkbox
+                            aria-label={`Prioritize ${letter}`}
+                            checked={isLetterFocused(letter, misses, activeFocusOverrides)}
+                            onCheckedChange={value => changeFocusLetters([letter], value === true)}
+                            ><CheckboxIndicator aria-hidden="true" /></Checkbox
+                          >
+                        </td>
                         <th scope="row">{letter}</th>
                         <td>
-                          <div class="miss-rate-track" aria-hidden="true">
-                            <div class="miss-rate-fill" style:width={`${missRate * 100}%`}></div>
-                          </div>
+                          {#if attempts}
+                            <div class="miss-rate-track" aria-hidden="true">
+                              <div class="miss-rate-fill" style:width={`${missRate * 100}%`}></div>
+                            </div>
+                          {/if}
                         </td>
-                        <td>{misses}/{attempts}</td>
+                        <td>{attempts ? `${misses}/${attempts}` : '—'}</td>
                       </tr>
                     {/each}
                   </tbody>
                 </table>
-              {:else}
-                <p>No letter attempts yet.</p>
               {/if}
               <div class="dialog-actions">
                 {#if letterBreakdown.length}
