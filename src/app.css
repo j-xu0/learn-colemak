@@ -96,6 +96,10 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 .session-controls { display: flex; flex-wrap: wrap; gap: 9px; }
 .practice-select[data-slot="select-trigger"] { justify-content: space-between; width: 100%; min-width: 67px; }
 .practice-select-options[data-slot="select-content"] { color: var(--ink); background: var(--paper); border-color: var(--edge); }
+.layout-select-options [data-slot="select-item"][data-highlighted] {
+  color: var(--paper);
+  background: var(--accent);
+}
 
 .stats {
   display: grid;
