@@ -11,6 +11,13 @@
     DialogTitle,
     DialogTrigger,
   } from '@ui-sdk/svelte/dialog'
+  import { measurePromptWindow } from './prompt-window'
+  import {
+    balanceStorageKey,
+    defaultWordLimit,
+    practiceStorageKey,
+    type StartupPractice,
+  } from './startup-practice'
   import PracticeSelect from './PracticeSelect.svelte'
   import {
     codes,
@@ -20,7 +27,6 @@
     layouts,
     lessonKeys,
     mappedKey,
-    promptWindow,
     recordLetterAttempt,
     summarizeLetterHistory,
     validateLayout,
@@ -28,6 +34,8 @@
     type LetterHistory,
     type LetterFocusOverrides,
   } from './practice'
+
+  let { startup }: { startup?: StartupPractice } = $props()
 
   const lessons = [
     'Lesson 1',
@@ -41,7 +49,6 @@
   const options = (values: (number | string)[]) =>
     values.map(value => ({ value: String(value), label: String(value) }))
   const layoutOptions = options([...Object.keys(layouts), 'Custom'])
-  const defaultWordLimit = 50
   const wordOptions = options([10, 25, 50, 100])
   const timeOptions = options([15, 30, 60, 120])
   const sessionOptions = [
@@ -67,8 +74,6 @@
   }
 
   const storageKey = 'learn-colemak:custom-layout'
-  const practiceStorageKey = 'learn-colemak:missed-letters:v1'
-  const balanceStorageKey = 'learn-colemak:balance-letters'
   let balanceLetters = $state(true)
   let practiceMissedLetters = $state(false)
 
@@ -168,8 +173,8 @@
   let punctuation = $state(false)
   let scroll = $state(false)
   let remap = $state(true)
-  let nextWords = createPromptGenerator(layouts.Colemak, 0, false, false)
-  let prompt = $state(nextWords(defaultWordLimit))
+  let nextWords: ReturnType<typeof createPromptGenerator>
+  let prompt = $state<string[]>([])
   let wordIndex = $state(0)
   let entered = $state<string[]>([])
   let attempts = $state(0)
@@ -200,13 +205,8 @@
   let wpm = $derived(elapsed > 0 ? Math.round((accepted * 12) / elapsed) : 0)
   let accuracy = $derived(attempts ? Math.round((hits * 100) / attempts) : 100)
   let preview = $derived.by(() => {
-    const style = promptElement && getComputedStyle(promptElement)
-    const measure = wordMeasure
-    if (style && promptWidth && measure) {
-      measure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
-      const gap = parseFloat(style.columnGap)
-      const widths = prompt.map(word => measure.measureText(word).width)
-      return promptWindow(widths, wordIndex, promptWidth, gap, scroll)
+    if (promptElement && promptWidth && wordMeasure) {
+      return measurePromptWindow(promptElement, wordMeasure, prompt, wordIndex, promptWidth, scroll)
     }
     const start = Math.floor(wordIndex / 24) * 24
     return { start, end: start + 24 }
@@ -272,13 +272,13 @@
 
   onMount(() => {
     try {
-      balanceLetters = localStorage.getItem(balanceStorageKey) !== 'false'
       const savedTheme = localStorage.getItem(themeStorageKey)
       if (savedTheme === 'Light' || savedTheme === 'Dark') applyTheme(savedTheme)
     } catch {
       // Storage may be disabled by the browser.
     }
     wordMeasure = document.createElement('canvas').getContext('2d')
+    promptWidth = promptElement?.clientWidth ?? 0
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
       if (saved) {
@@ -292,49 +292,14 @@
     } catch {
       // Storage can contain malformed data or be unavailable in private browsing.
     }
-    try {
-      const saved = JSON.parse(localStorage.getItem(practiceStorageKey) ?? 'null')
-      practiceMissedLetters = saved?.enabled === true
-      if (saved?.focusOverrides && typeof saved.focusOverrides === 'object') {
-        focusOverrides = Object.fromEntries(
-          Object.entries(saved.focusOverrides).flatMap(([key, value]) =>
-            value && typeof value === 'object'
-              ? [
-                  [
-                    key,
-                    Object.fromEntries(
-                      Object.entries(value).filter(([, checked]) => typeof checked === 'boolean'),
-                    ),
-                  ],
-                ]
-              : [],
-          ),
-        )
-      } else if (saved?.focusExclusions && typeof saved.focusExclusions === 'object') {
-        focusOverrides = Object.fromEntries(
-          Object.entries(saved.focusExclusions).flatMap(([key, letters]) =>
-            Array.isArray(letters)
-              ? [
-                  [
-                    key,
-                    Object.fromEntries(
-                      letters
-                        .filter(letter => typeof letter === 'string')
-                        .map(letter => [letter, false]),
-                    ),
-                  ],
-                ]
-              : [],
-          ),
-        )
-      }
-      if (saved?.layouts && typeof saved.layouts === 'object' && !Array.isArray(saved.layouts)) {
-        letterHistories = saved.layouts
-      }
-    } catch {
-      // Start with empty history if stored data cannot be read.
+    if (startup) {
+      balanceLetters = startup.balanceLetters
+      practiceMissedLetters = startup.practiceMissedLetters
+      focusOverrides = startup.focusOverrides
+      letterHistories = startup.letterHistories
+      nextWords = startup.nextWords
+      prompt = startup.prompt
     }
-    reset()
     const timer = window.setInterval(updateClock, 100)
     const storageTimer = window.setInterval(saveLetterHistory, 1000)
     return () => {
@@ -701,6 +666,7 @@
           />
           <span class="sr-only" id="prompt">{visibleWords.join(' ')}</span>
           <div
+            id="practice-prompt"
             class="prompt"
             bind:this={promptElement}
             bind:clientWidth={promptWidth}

@@ -3,6 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/src/app.css" />
+    <script>
+      try {
+        const theme = localStorage.getItem('learn-colemak:theme')
+        if (theme === 'Light' || theme === 'Dark') {
+          document.documentElement.dataset.theme = theme.toLowerCase()
+        }
+      } catch {}
+    </script>
     <title>Learn Colemak</title>
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <meta
@@ -11,11 +20,11 @@
     />
   </head>
   <body>
-    <div id="app"></div>
+    <!--app-html-->
     <footer class="site-footer">
       <a href="https://github.com/j-xu0/learn-colemak">Source code</a>
       <a href="%BASE_URL%licenses/frontend-dependencies.txt">Dependency licenses</a>
     </footer>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/bootstrap.ts"></script>
   </body>
 </html>
