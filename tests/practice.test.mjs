@@ -76,22 +76,41 @@ test('every progressive drill word uses a key introduced in that lesson', () => 
 })
 
 test('word drills use the pinned English 5k list', () => {
-  const words = new Set(english5k.words.map(word => word.toLowerCase()))
+  const words = new Set(english5k.words)
   assert.equal(words.size, 5000)
   for (let lesson = 0; lesson <= 6; lesson++) {
     const prompt = createPrompt(layouts.Colemak, lesson, 100, false, false)
-    assert.ok(prompt.every(word => words.has(word)))
+    assert.ok(prompt.every(word => words.has(word) && word === word.toLowerCase()))
   }
+})
+
+test('capital-letter practice preserves source casing within progressive lessons', () => {
+  const layout = layouts.Colemak
+  const { previous, current } = lessonKeys(layout, 3)
+  const allowed = new Set([...previous, ...current])
+  const eligibleCount = english5k.words.filter(word => {
+    const letters = [...word.toLowerCase()]
+    return (
+      letters.every(letter => allowed.has(letter)) && letters.some(letter => current.has(letter))
+    )
+  }).length
+  const prompt = createPromptGenerator(
+    layout,
+    3,
+    true,
+    false,
+    undefined,
+    undefined,
+    false,
+  )(eligibleCount)
+  assert.ok(prompt.includes('Canada'))
+  assert.ok(!prompt.includes('canada'))
 })
 
 test('frequency-weighted batches share a word pool and avoid repeats when it refills', () => {
   const layout = layouts.Colemak
   const { current } = lessonKeys(layout, 0)
-  const eligible = new Set(
-    english5k.words
-      .map(word => word.toLowerCase())
-      .filter(word => [...word].every(key => current.has(key))),
-  )
+  const eligible = new Set(english5k.words.filter(word => [...word].every(key => current.has(key))))
   const nextWords = createPromptGenerator(layout, 0, false, false, undefined, undefined, false)
   const firstPass = [...nextWords(48), ...nextWords(eligible.size - 48)]
 

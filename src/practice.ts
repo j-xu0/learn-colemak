@@ -62,7 +62,7 @@ export const layouts: Record<string, Layout> = {
   Workman: layout([base[0], 'qdrwbjfup;[]\\', "ashtgyneoi'", 'zxmcvkl,./']),
 }
 
-const words = [...new Set(english5k.words.map(word => word.toLowerCase()))].map((word, rank) => ({
+const words = [...new Set(english5k.words)].map((word, rank) => ({
   word,
   weight: 1 / Math.sqrt(rank + 1),
 }))
@@ -213,7 +213,8 @@ export function createPromptGenerator(
   const keys = new Set([...layout.base.join(''), ...layout.shift.join(''), ' '])
   const { previous, current } = lessonKeys(layout, lesson)
   const allowed = lesson < 6 ? new Set([...previous, ...current]) : keys
-  const fits = (word: string, set: Set<string>) => [...word].every(char => set.has(char))
+  const matchesLessonKey = (char: string, set: Set<string>) =>
+    set.has(char) || (caps && set.has(char.toLowerCase()))
   const capitalize = (word: string) => {
     const first = [...word][0]
     const upper = first.toUpperCase()
@@ -223,7 +224,10 @@ export function createPromptGenerator(
     punctuation && keys.has(mark) ? word + mark : word
 
   const eligible = words.filter(
-    ({ word }) => fits(word, allowed) && (lesson >= 6 || [...word].some(char => current.has(char))),
+    ({ word }) =>
+      (caps || word === word.toLowerCase()) &&
+      [...word].every(char => keys.has(char) && matchesLessonKey(char, allowed)) &&
+      (lesson >= 6 || [...word].some(char => matchesLessonKey(char, current))),
   )
   const letters = [...(current.size ? current : allowed)].filter(char => char !== ' ')
   const focusWeights = new Map(
