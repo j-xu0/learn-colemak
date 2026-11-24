@@ -4,13 +4,13 @@
   font-family: system-ui, sans-serif;
   color-scheme: light dark;
   color: var(--ink);
-  background: light-dark(#f5f7f6, #151c1d);
+  background: light-dark(#f5f7f6, #080808);
   font-synthesis: none;
   --ink: light-dark(#192628, #e4eeeb);
   --muted: light-dark(#4c605f, #aabeb9);
-  --line: light-dark(#c6d3cf, #374847);
+  --line: light-dark(#c6d3cf, #303030);
   --edge: light-dark(#798e87, #708983);
-  --paper: light-dark(#fff, #202a2b);
+  --paper: light-dark(#fff, #141414);
   --accent: light-dark(#175d4b, #8bdab9);
   --selected: light-dark(#dcebe4, #294239);
   --on-accent: light-dark(white, #122720);
@@ -171,7 +171,7 @@ kbd.previous { background: light-dark(#dfebf5, #30475c); border-color: light-dar
   padding: clamp(6px, 1vw, 10px);
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: light-dark(#e5eae8, #192223);
+  background: light-dark(#e5eae8, #0d0d0d);
 }
 .key-row { display: grid; grid-template-columns: repeat(60, minmax(0, 1fr)); }
 .key-row kbd { grid-column: span 4; margin-inline: min(.35vw, 3px); }
@@ -205,7 +205,7 @@ kbd.anchor::after {
   background: currentColor;
   opacity: .5;
 }
-kbd.empty { background: light-dark(#edf0ee, #1c2727); border-color: light-dark(#bac8c3, #3e5550); }
+kbd.empty { background: light-dark(#edf0ee, #101010); border-color: light-dark(#bac8c3, #363636); }
 
 .button[data-slot="button"] { min-height: 36px; padding-inline: 10px; border-radius: 5px; font-size: 13px; }
 .button.subtle[data-slot="button"] { color: var(--ink); background: var(--paper); border: 1px solid var(--edge); }
@@ -218,7 +218,7 @@ dialog {
   background: var(--paper);
   color: var(--ink);
 }
-dialog::backdrop { background: light-dark(#12252185, #080d0db3); }
+dialog::backdrop { background: light-dark(#12252185, #000000b3); }
 dialog form { display: grid; gap: 14px; }
 dialog p { color: var(--muted); font-size: 14px; }
 .editor-layers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
