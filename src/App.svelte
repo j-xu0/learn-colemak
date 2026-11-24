@@ -12,6 +12,24 @@
   const wordOptions = options([10, 25, 50, 100])
   const timeOptions = options([15, 30, 60, 120])
   const sessionOptions = [{ value: 'words', label: 'Word count' }, { value: 'time', label: 'Timed' }]
+  const themeOptions = options(['System', 'Light', 'Dark'])
+  const themeStorageKey = 'learn-colemak:theme'
+  let theme = $state('System')
+
+  function applyTheme(value: string) {
+    theme = value
+    document.documentElement.dataset.theme = value.toLowerCase()
+  }
+
+  function changeTheme(value: string) {
+    applyTheme(value)
+    try {
+      localStorage.setItem(themeStorageKey, value)
+    } catch {
+      // Storage may be disabled by the browser.
+    }
+  }
+
   const storageKey = 'learn-colemak:custom-layout'
   let layoutName = $state('Colemak')
   let custom = $state<Layout>(layouts.Colemak)
@@ -102,6 +120,12 @@
   })
 
   onMount(() => {
+    try {
+      const savedTheme = localStorage.getItem(themeStorageKey)
+      if (savedTheme === 'Light' || savedTheme === 'Dark') applyTheme(savedTheme)
+    } catch {
+      // Storage may be disabled by the browser.
+    }
     wordMeasure = document.createElement('canvas').getContext('2d')
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
@@ -249,7 +273,10 @@
 <header class="site-header">
   <div class="header-inner">
     <h1 class="brand">Learn Colemak</h1>
-    <Button class="button subtle" onclick={openEditor}>Edit custom layout</Button>
+    <div class="header-controls">
+      <PracticeSelect label="Theme" items={themeOptions} value={theme} change={changeTheme} />
+      <Button class="button subtle" onclick={openEditor}>Edit custom layout</Button>
+    </div>
   </div>
 </header>
 
@@ -299,7 +326,7 @@
           <span class="sr-only" id="prompt">{visibleWords.join(' ')}</span>
           <div class="prompt" bind:this={promptElement} bind:clientWidth={promptWidth} aria-hidden="true">
             {#each visibleWords as word, i (preview.start + i)}
-              <span class="word" class:done={preview.start + i < wordIndex}>
+              <span class="word" class:done={preview.start + i < wordIndex} class:active={preview.start + i === wordIndex}>
                 {#if preview.start + i === wordIndex}
                   {#each [...word] as key, index (index)}<span class:correct={entered[index] === key} class:wrong={entered[index] !== undefined && entered[index] !== key} class:caret={index === entered.length}>{key}</span>{/each}
                   {#each entered.slice(target.length) as key, index (index)}<span class="wrong">{key === ' ' ? '␣' : key}</span>{/each}
