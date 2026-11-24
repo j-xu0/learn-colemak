@@ -84,7 +84,7 @@ test('word drills use the pinned English 5k list', () => {
   }
 })
 
-test('timed batches share a word pool and avoid adjacent repeats when it refills', () => {
+test('frequency-weighted batches share a word pool and avoid repeats when it refills', () => {
   const layout = layouts.Colemak
   const { current } = lessonKeys(layout, 0)
   const eligible = new Set(
@@ -92,12 +92,53 @@ test('timed batches share a word pool and avoid adjacent repeats when it refills
       .map(word => word.toLowerCase())
       .filter(word => [...word].every(key => current.has(key))),
   )
-  const nextWords = createPromptGenerator(layout, 0, false, false)
+  const nextWords = createPromptGenerator(layout, 0, false, false, undefined, undefined, false)
   const firstPass = [...nextWords(48), ...nextWords(eligible.size - 48)]
 
   assert.equal(firstPass.length, eligible.size)
   assert.deepEqual(new Set(firstPass), eligible)
   assert.notEqual(nextWords(1)[0], firstPass.at(-1))
+})
+
+test('balanced prompts narrow the letter count spread in Lesson 1 and All Words', t => {
+  const layout = layouts.Colemak
+  let seed = 0
+  t.mock.method(Math, 'random', () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+    return seed / 2 ** 32
+  })
+  for (const [lesson, letters] of [
+    [0, layout.groups[0]],
+    [6, layout.groups.join('')],
+  ]) {
+    const counts = balance => {
+      seed = 42
+      const generate = createPromptGenerator(
+        layout,
+        lesson,
+        false,
+        false,
+        undefined,
+        undefined,
+        balance,
+      )
+      const prompt = [...generate(25), ...generate(25)].join('')
+      return [...letters].map(letter => prompt.split(letter).length - 1)
+    }
+    const balanced = counts(true)
+    const weighted = counts(false)
+    assert.ok(Math.min(...balanced) > 0)
+    assert.ok(
+      Math.max(...balanced) / Math.min(...balanced) < Math.max(...weighted) / Math.min(...weighted),
+    )
+  }
+})
+
+test('balanced drills cover earlier keys when no dictionary words fit', () => {
+  const layout = { ...layouts.Colemak, groups: ['ab', '@'] }
+  const prompt = createPromptGenerator(layout, 1, false, false)(10)
+  assert.ok(prompt.every(word => word.startsWith('@')))
+  assert.deepEqual(new Set(prompt.join('')), new Set('@ab'))
 })
 
 test('letter history keeps recent attempts and combines cases', () => {
@@ -119,6 +160,10 @@ test('focused prompts prioritize missed letters and preserve lesson eligibility'
     h: '00001',
   })
   const focused = generator(10)
+  assert.deepEqual(
+    createPromptGenerator(layout, 1, false, false, { h: '00001' }, { h: false })(10),
+    baseline,
+  )
   assert.ok(
     focused.filter(word => word.includes('h')).length >
       baseline.filter(word => word.includes('h')).length,
@@ -130,10 +175,10 @@ test('focused prompts prioritize missed letters and preserve lesson eligibility'
   }
 })
 
-test('focus scales with severity, includes short histories, and honors manual choices', t => {
+test('frequency-weighted focus scales with severity, includes short histories, and honors manual choices', t => {
   t.mock.method(Math, 'random', () => 0.5)
   const prompt = (history, overrides) =>
-    createPromptGenerator(layouts.Colemak, 1, false, false, history, overrides)(10)
+    createPromptGenerator(layouts.Colemak, 1, false, false, history, overrides, false)(10)
   const baseline = prompt()
   const mild = prompt({ h: '00111' })
   const severe = prompt({ h: '00001' })
