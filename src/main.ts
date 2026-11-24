@@ -1,11 +1,10 @@
-import { mount } from 'svelte'
-import '@ui-sdk/core/web.css'
-import './app.css'
+import { hydrate } from 'svelte'
 import './agent'
 import App from './App.svelte'
+import { restorePromptMarkup, startup } from './startup-prompt'
 
-const app = mount(App, {
+restorePromptMarkup()
+hydrate(App, {
   target: document.getElementById('app')!,
+  props: { startup },
 })
-
-export default app
