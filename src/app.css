@@ -371,12 +371,16 @@ main {
   clip-path: inset(50%);
 }
 .prompt {
+  --prompt-row-gap: 4px;
+  --prompt-two-lines: calc(2lh + var(--prompt-row-gap));
+
   display: flex;
+  align-self: center;
   align-content: safe center;
   flex-wrap: wrap;
-  gap: 4px 0.64em;
-  contain: size;
-  min-height: max(83px, calc(2lh + 4px));
+  gap: var(--prompt-row-gap) 0.64em;
+  block-size: var(--prompt-two-lines);
+  margin-block: max(0px, calc((83px - var(--prompt-two-lines)) / 2));
   overflow: hidden;
   color: var(--muted);
   font: 500 clamp(19px, 3vw, 28px)/1.55 var(--mono);
