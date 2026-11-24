@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import english5k from '../src/data/english_5k.json' with { type: 'json' }
-import { codes, createPrompt, layouts, lessonKeys, mappedKey, validateLayout } from '../src/practice.ts'
+import { codes, createPrompt, createPromptGenerator, layouts, lessonKeys, mappedKey, validateLayout } from '../src/practice.ts'
 
 test('each layout contains six usable lessons and two full key layers', () => {
   for (const [name, layout] of Object.entries(layouts)) {
@@ -54,4 +54,17 @@ test('word drills use the pinned English 5k list', () => {
     const prompt = createPrompt(layouts.Colemak, lesson, 100, false, false)
     assert.ok(prompt.every(word => words.has(word)))
   }
+})
+
+test('timed batches share a word pool and avoid adjacent repeats when it refills', () => {
+  const layout = layouts.Colemak
+  const { current } = lessonKeys(layout, 0)
+  const eligible = new Set(english5k.words.map(word => word.toLowerCase())
+    .filter(word => [...word].every(key => current.has(key))))
+  const nextWords = createPromptGenerator(layout, 0, false, false)
+  const firstPass = [...nextWords(48), ...nextWords(eligible.size - 48)]
+
+  assert.equal(firstPass.length, eligible.size)
+  assert.deepEqual(new Set(firstPass), eligible)
+  assert.notEqual(nextWords(1)[0], firstPass.at(-1))
 })

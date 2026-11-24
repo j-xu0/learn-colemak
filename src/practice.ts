@@ -43,7 +43,10 @@ export const layouts: Record<string, Layout> = {
   Workman: layout([base[0], 'qdrwbjfup;[]\\', "ashtgyneoi'", 'zxmcvkl,./']),
 }
 
-const words = english5k.words.map(word => word.toLowerCase())
+const words = [...new Set(english5k.words.map(word => word.toLowerCase()))].map((word, rank) => ({
+  word,
+  weight: 1 / Math.sqrt(rank + 1),
+}))
 
 export function validateLayout(baseText: string, shiftText: string, groupText: string): Layout | string {
   const layers = [baseText, shiftText].map(text => text.trim().split(/\r?\n/))
@@ -68,7 +71,7 @@ export function lessonKeys(layout: Layout, lesson: number) {
   return { previous, current }
 }
 
-export function createPrompt(layout: Layout, lesson: number, count: number, caps: boolean, punctuation: boolean) {
+export function createPromptGenerator(layout: Layout, lesson: number, caps: boolean, punctuation: boolean) {
   const keys = new Set([...layout.base.join(''), ...layout.shift.join(''), ' '])
   const { previous, current } = lessonKeys(layout, lesson)
   const allowed = lesson < 6 ? new Set([...previous, ...current]) : keys
@@ -80,19 +83,34 @@ export function createPrompt(layout: Layout, lesson: number, count: number, caps
   }
   const punctuate = (word: string, mark: string) => punctuation && keys.has(mark) ? word + mark : word
 
-  const eligible = words.filter(word => fits(word, allowed) && (lesson >= 6 || [...word].some(char => current.has(char))))
+  const eligible = words.filter(({ word }) => fits(word, allowed) && (lesson >= 6 || [...word].some(char => current.has(char))))
   const letters = [...(current.size ? current : allowed)].filter(char => char !== ' ')
-  const result: string[] = []
-  let lastIndex = -1
-  for (let i = 0; i < count; i++) {
-    const excludeLast = lastIndex >= 0 && eligible.length > 1
-    let index = Math.floor(Math.random() * (eligible.length - Number(excludeLast)))
-    if (excludeLast && index >= lastIndex) index += 1
-    const word = eligible[index] ?? Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * letters.length)]).join('')
-    lastIndex = index
-    result.push(i % 8 === 0 ? capitalize(word) : i % 8 === 7 ? punctuate(word, '.') : word)
-  }
-  return result
+  let remaining: string[] = []
+  let lastWord: string | undefined
+  let position = 0
+
+  return (count: number) => Array.from({ length: count }, () => {
+    if (!remaining.length && eligible.length) {
+      // Random priorities favor common words early in each pass without repeating them.
+      remaining = eligible
+        .map(({ word, weight }) => ({ word, priority: -Math.log(1 - Math.random()) / weight }))
+        .sort((a, b) => b.priority - a.priority)
+        .map(({ word }) => word)
+      const next = remaining.length - 1
+      if (next > 0 && remaining[next] === lastWord) {
+        [remaining[next], remaining[next - 1]] = [remaining[next - 1], remaining[next]]
+      }
+    }
+
+    const word = remaining.pop() ?? Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * letters.length)]).join('')
+    lastWord = word
+    const slot = position++ % 8
+    return slot === 0 ? capitalize(word) : slot === 7 ? punctuate(word, '.') : word
+  })
+}
+
+export function createPrompt(layout: Layout, lesson: number, count: number, caps: boolean, punctuation: boolean) {
+  return createPromptGenerator(layout, lesson, caps, punctuation)(count)
 }
 
 export function mappedKey(layout: Layout, code: string, shift: boolean, capsLock: boolean) {
