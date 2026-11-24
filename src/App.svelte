@@ -3,7 +3,7 @@
   import { Button } from '@ui-sdk/svelte/button'
   import { Checkbox, CheckboxIndicator } from '@ui-sdk/svelte/checkbox'
   import PracticeSelect from './PracticeSelect.svelte'
-  import { codes, createPrompt, keyRows, layouts, lessonKeys, mappedKey, validateLayout, type Layout } from './practice'
+  import { codes, createPromptGenerator, keyRows, layouts, lessonKeys, mappedKey, validateLayout, type Layout } from './practice'
 
   const lessons = ['Lesson 1', 'Lesson 2', 'Lesson 3', 'Lesson 4', 'Lesson 5', 'Lesson 6', 'All Words']
   const options = (values: (number | string)[]) => values.map(value => ({ value: String(value), label: String(value) }))
@@ -42,7 +42,8 @@
   let punctuation = $state(false)
   let scroll = $state(false)
   let remap = $state(true)
-  let prompt = $state(createPrompt(layouts.Colemak, 0, defaultWordLimit, false, false))
+  let nextWords = createPromptGenerator(layouts.Colemak, 0, false, false)
+  let prompt = $state(nextWords(defaultWordLimit))
   let wordIndex = $state(0)
   let entered = $state<string[]>([])
   let attempts = $state(0)
@@ -197,7 +198,8 @@
   }
 
   function reset(focus = false) {
-    prompt = createPrompt(layouts[layoutName] ?? custom, lesson, mode === 'words' ? wordLimit : 48, caps, punctuation)
+    nextWords = createPromptGenerator(layouts[layoutName] ?? custom, lesson, caps, punctuation)
+    prompt = nextWords(mode === 'words' ? wordLimit : 48)
     wordIndex = 0
     entered = []
     attempts = 0
@@ -215,7 +217,7 @@
     wordIndex += 1
     entered = []
     if (mode === 'time' && wordIndex >= prompt.length - 48) {
-      prompt = [...prompt, ...createPrompt(layout, lesson, 48, caps, punctuation)]
+      prompt = [...prompt, ...nextWords(48)]
     } else if (wordIndex === prompt.length) {
       elapsed = Math.max(0.001, (performance.now() - started!) / 1000)
       finish()
