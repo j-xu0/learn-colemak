@@ -133,6 +133,7 @@
   let editorError = $state('')
 
   let target = $derived([...(prompt[wordIndex] ?? '')])
+  let extraInput = $derived(entered.slice(target.length).join('').replaceAll(' ', '␣'))
   let currentKey = $derived(entered.length < target.length ? target[entered.length] : ' ')
   let keyboard = $derived([...layout.base.join('')])
   let shifted = $derived([...layout.shift.join('')])
@@ -153,6 +154,17 @@
     return { start, end: start + 24 }
   })
   let visibleWords = $derived(prompt.slice(preview.start, preview.end))
+
+  $effect(() => {
+    const prompt = promptElement
+    const hasExtras = extraInput.length > 0
+    if (!prompt) return
+    const endCaret = hasExtras ? prompt.querySelector('.end-caret') : null
+    const overflow = endCaret
+      ? endCaret.getBoundingClientRect().bottom - prompt.getBoundingClientRect().bottom
+      : -prompt.scrollTop
+    prompt.scrollTop = Math.max(0, prompt.scrollTop + overflow)
+  })
 
   let chart = $derived.by(() => {
     const maxSpeed = Math.max(10, ...samples.map(point => point.speed))
@@ -611,15 +623,13 @@
                       class:correct={entered[index] === key}
                       class:wrong={entered[index] !== undefined && entered[index] !== key}
                       class:caret={index === entered.length}>{key}</span
-                    >{/each}{#each entered.slice(target.length) as key, index (index)}<span
-                      class="wrong">{key === ' ' ? '␣' : key}</span
-                    >{/each}{#if entered.length >= target.length}<span class="end-caret"
-                    ></span>{/if}
+                    >{/each}{#if extraInput}<span class="extra-input">{extraInput}</span
+                    >{/if}{#if entered.length >= target.length}<span class="end-caret"></span>{/if}
                 {:else}{word}{/if}
               </span>
             {/each}
           </div>
-          <p id="typing-help">{started === null ? 'Type to begin.' : 'Press Esc to restart.'}</p>
+          <p id="typing-help">Press Esc to restart.</p>
         </div>
       {/if}
 
