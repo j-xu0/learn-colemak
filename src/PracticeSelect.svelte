@@ -1,7 +1,20 @@
 <script lang="ts">
-  import { Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@ui-sdk/svelte/select'
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+  } from '@ui-sdk/svelte/select'
 
-  let { label, items, value, change, optionsClass = '' }: {
+  let {
+    label,
+    items,
+    value,
+    change,
+    optionsClass = '',
+  }: {
     label: string
     items: { label: string; value: string }[]
     value: string
@@ -11,7 +24,13 @@
 </script>
 
 <div class="field">
-  <Select {items} {value} onValueChange={(next) => { if (typeof next === 'string') change(next) }}>
+  <Select
+    {items}
+    {value}
+    onValueChange={next => {
+      if (typeof next === 'string') change(next)
+    }}
+  >
     <SelectLabel>{label}</SelectLabel>
     <SelectTrigger class="practice-select">
       <SelectValue />

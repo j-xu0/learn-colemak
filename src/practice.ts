@@ -8,7 +8,7 @@ export const keyRows = [
 ].map(row => row.split(' '))
 
 export const codes = keyRows.flat()
-const base = ["`1234567890-=", "qwertyuiop[]\\", "asdfghjkl;'", "zxcvbnm,./"]
+const base = ['`1234567890-=', 'qwertyuiop[]\\', "asdfghjkl;'", 'zxcvbnm,./']
 const shift = ['~!@#$%^&*()_+', 'QWERTYUIOP{}|', 'ASDFGHJKL:"', 'ZXCVBNM<>?'].join('')
 const shiftByKey = new Map([...base.join('')].map((key, i) => [key, shift[i]]))
 
@@ -16,24 +16,43 @@ export type Layout = { base: string[]; shift: string[]; groups: string[] }
 
 function layout(rows: string[], groups?: string): Layout {
   const keys = [...rows.join('')]
-  const letters = [...new Set([...rows[2] + rows[1] + rows[3] + rows[0]].filter(key => /[a-z]/.test(key)))].join('')
+  const letters = [
+    ...new Set([...(rows[2] + rows[1] + rows[3] + rows[0])].filter(key => /[a-z]/.test(key))),
+  ].join('')
   return {
     base: rows,
-    shift: keyRows.map(row => row.map(code => {
-      const key = keys[codes.indexOf(code)]
-      return shiftByKey.get(key) ?? key.toUpperCase()
-    }).join('')),
-    groups: groups?.split(' ') ?? [letters.slice(0, 8), letters.slice(8, 12), letters.slice(12, 16), letters.slice(16, 20), letters.slice(20, 23), letters.slice(23)],
+    shift: keyRows.map(row =>
+      row
+        .map(code => {
+          const key = keys[codes.indexOf(code)]
+          return shiftByKey.get(key) ?? key.toUpperCase()
+        })
+        .join(''),
+    ),
+    groups: groups?.split(' ') ?? [
+      letters.slice(0, 8),
+      letters.slice(8, 12),
+      letters.slice(12, 16),
+      letters.slice(16, 20),
+      letters.slice(20, 23),
+      letters.slice(23),
+    ],
   }
 }
 
 const colemakGroups = 'arstneio dh pgjl cvbk wfuy qzxm'
 export const layouts: Record<string, Layout> = {
   Colemak: layout([base[0], 'qwfpgjluy;[]\\', "arstdhneio'", 'zxcvbkm,./'], colemakGroups),
-  'Colemak-DH': layout([base[0], 'qwfpbjluy;[]\\', "arstgkneio'", 'zxcdvmh,./'], 'arstneio gk pbjl cdvm wfuy qzxh'),
-  'Colemak-DHm': layout([base[0], 'qwfpbjluy;[]\\', "arstgmneio'", 'zxcdvkh,./'], 'arstneio gm pbjl cdvk wfuy qzxh'),
-  Dvorak: layout(["`1234567890[]", "',.pyfgcrl/=\\", 'aoeuidhtns-', ';qjkxbmwvz']),
-  'Left-handed Dvorak': layout(["`[]/pfmlj4321", ';qbyurso.65=\\', '-kcdtheaz87', "'xgvwni,09"]),
+  'Colemak-DH': layout(
+    [base[0], 'qwfpbjluy;[]\\', "arstgkneio'", 'zxcdvmh,./'],
+    'arstneio gk pbjl cdvm wfuy qzxh',
+  ),
+  'Colemak-DHm': layout(
+    [base[0], 'qwfpbjluy;[]\\', "arstgmneio'", 'zxcdvkh,./'],
+    'arstneio gm pbjl cdvk wfuy qzxh',
+  ),
+  Dvorak: layout(['`1234567890[]', "',.pyfgcrl/=\\", 'aoeuidhtns-', ';qjkxbmwvz']),
+  'Left-handed Dvorak': layout(['`[]/pfmlj4321', ';qbyurso.65=\\', '-kcdtheaz87', "'xgvwni,09"]),
   QWERTY: layout(base, 'asdfjkl ghert uiop bnmcv qwy xz'),
   AZERTY: {
     ...layout(['²&é"' + "'(-è_çà)=", 'azertyuiop^$*', 'qsdfghjklmù', 'wxcvbn,;:!']),
@@ -48,14 +67,27 @@ const words = [...new Set(english5k.words.map(word => word.toLowerCase()))].map(
   weight: 1 / Math.sqrt(rank + 1),
 }))
 
-export function validateLayout(baseText: string, shiftText: string, groupText: string): Layout | string {
+export function validateLayout(
+  baseText: string,
+  shiftText: string,
+  groupText: string,
+): Layout | string {
   const layers = [baseText, shiftText].map(text => text.trim().split(/\r?\n/))
-  if (layers.some(layer => layer.length !== 4 || layer.some((row, i) => [...row].length !== keyRows[i].length || /\s/.test(row)))) {
+  if (
+    layers.some(
+      layer =>
+        layer.length !== 4 ||
+        layer.some((row, i) => [...row].length !== keyRows[i].length || /\s/.test(row)),
+    )
+  ) {
     return 'Each layer needs four rows of 13, 13, 11, and 10 keys, with no spaces.'
   }
   const keys = layers.flatMap(layer => [...layer.join('')])
   const groups = groupText.trim().split(/\s+/)
-  if (groups.length !== 6 || groups.some(group => !group || [...group].some(key => !keys.includes(key)))) {
+  if (
+    groups.length !== 6 ||
+    groups.some(group => !group || [...group].some(key => !keys.includes(key)))
+  ) {
     return 'Enter six lesson groups separated by spaces. Use only characters in your key layers.'
   }
   const layout = { base: layers[0], shift: layers[1], groups }
@@ -66,12 +98,17 @@ export function validateLayout(baseText: string, shiftText: string, groupText: s
 }
 
 export function lessonKeys(layout: Layout, lesson: number) {
-  const previous = new Set([...layout.groups.slice(0, lesson).join('')])
+  const previous = new Set(layout.groups.slice(0, lesson).join(''))
   const current = new Set([...(layout.groups[lesson] ?? '')].filter(key => !previous.has(key)))
   return { previous, current }
 }
 
-export function createPromptGenerator(layout: Layout, lesson: number, caps: boolean, punctuation: boolean) {
+export function createPromptGenerator(
+  layout: Layout,
+  lesson: number,
+  caps: boolean,
+  punctuation: boolean,
+) {
   const keys = new Set([...layout.base.join(''), ...layout.shift.join(''), ' '])
   const { previous, current } = lessonKeys(layout, lesson)
   const allowed = lesson < 6 ? new Set([...previous, ...current]) : keys
@@ -81,35 +118,49 @@ export function createPromptGenerator(layout: Layout, lesson: number, caps: bool
     const upper = first.toUpperCase()
     return caps && keys.has(upper) ? upper + word.slice(first.length) : word
   }
-  const punctuate = (word: string, mark: string) => punctuation && keys.has(mark) ? word + mark : word
+  const punctuate = (word: string, mark: string) =>
+    punctuation && keys.has(mark) ? word + mark : word
 
-  const eligible = words.filter(({ word }) => fits(word, allowed) && (lesson >= 6 || [...word].some(char => current.has(char))))
+  const eligible = words.filter(
+    ({ word }) => fits(word, allowed) && (lesson >= 6 || [...word].some(char => current.has(char))),
+  )
   const letters = [...(current.size ? current : allowed)].filter(char => char !== ' ')
   let remaining: string[] = []
   let lastWord: string | undefined
   let position = 0
 
-  return (count: number) => Array.from({ length: count }, () => {
-    if (!remaining.length && eligible.length) {
-      // Random priorities favor common words early in each pass without repeating them.
-      remaining = eligible
-        .map(({ word, weight }) => ({ word, priority: -Math.log(1 - Math.random()) / weight }))
-        .sort((a, b) => b.priority - a.priority)
-        .map(({ word }) => word)
-      const next = remaining.length - 1
-      if (next > 0 && remaining[next] === lastWord) {
-        [remaining[next], remaining[next - 1]] = [remaining[next - 1], remaining[next]]
+  return (count: number) =>
+    Array.from({ length: count }, () => {
+      if (!remaining.length && eligible.length) {
+        // Random priorities favor common words early in each pass without repeating them.
+        remaining = eligible
+          .map(({ word, weight }) => ({ word, priority: -Math.log(1 - Math.random()) / weight }))
+          .sort((a, b) => b.priority - a.priority)
+          .map(({ word }) => word)
+        const next = remaining.length - 1
+        if (next > 0 && remaining[next] === lastWord) {
+          ;[remaining[next], remaining[next - 1]] = [remaining[next - 1], remaining[next]]
+        }
       }
-    }
 
-    const word = remaining.pop() ?? Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * letters.length)]).join('')
-    lastWord = word
-    const slot = position++ % 8
-    return slot === 0 ? capitalize(word) : slot === 7 ? punctuate(word, '.') : word
-  })
+      const word =
+        remaining.pop() ??
+        Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * letters.length)]).join(
+          '',
+        )
+      lastWord = word
+      const slot = position++ % 8
+      return slot === 0 ? capitalize(word) : slot === 7 ? punctuate(word, '.') : word
+    })
 }
 
-export function createPrompt(layout: Layout, lesson: number, count: number, caps: boolean, punctuation: boolean) {
+export function createPrompt(
+  layout: Layout,
+  lesson: number,
+  count: number,
+  caps: boolean,
+  punctuation: boolean,
+) {
   return createPromptGenerator(layout, lesson, caps, punctuation)(count)
 }
 
