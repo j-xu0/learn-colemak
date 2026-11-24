@@ -2,6 +2,15 @@
   import { onMount, tick } from 'svelte'
   import { Button } from '@ui-sdk/svelte/button'
   import { Checkbox, CheckboxIndicator } from '@ui-sdk/svelte/checkbox'
+  import {
+    Dialog,
+    DialogBackdrop,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+    DialogTrigger,
+  } from '@ui-sdk/svelte/dialog'
   import PracticeSelect from './PracticeSelect.svelte'
   import {
     codes,
@@ -10,8 +19,11 @@
     layouts,
     lessonKeys,
     mappedKey,
+    recordLetterAttempt,
+    summarizeLetterHistory,
     validateLayout,
     type Layout,
+    type LetterHistory,
   } from './practice'
 
   const lessons = [
@@ -52,9 +64,43 @@
   }
 
   const storageKey = 'learn-colemak:custom-layout'
+  const practiceStorageKey = 'learn-colemak:missed-letters:v1'
+  let practiceMissedLetters = $state(false)
+  let letterHistories = $state<Record<string, LetterHistory>>({})
+  let historyDirty = false
+
+  function saveLetterHistory() {
+    if (!historyDirty) return
+    historyDirty = false
+    try {
+      localStorage.setItem(
+        practiceStorageKey,
+        JSON.stringify({ enabled: practiceMissedLetters, layouts: letterHistories }),
+      )
+    } catch {
+      // Keep using the in-memory history when storage is unavailable.
+    }
+  }
+
   let layoutName = $state('Colemak')
   let custom = $state<Layout>(layouts.Colemak)
   let layout = $derived(layouts[layoutName] ?? custom)
+  let historyKey = $derived(
+    layoutName === 'Custom' ? JSON.stringify([custom.base, custom.shift]) : layoutName,
+  )
+  let activeLetterHistory = $derived.by(() => {
+    const saved = letterHistories[historyKey]
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : undefined
+  })
+  let letterBreakdownOpen = $state(false)
+  let letterBreakdown = $derived(summarizeLetterHistory(activeLetterHistory ?? {}))
+
+  function resetLetterHistory() {
+    if (!window.confirm(`Clear missed-letter history for ${layoutName}?`)) return
+    delete letterHistories[historyKey]
+    historyDirty = true
+    saveLetterHistory()
+  }
   let lesson = $state(0)
   let mode = $state<'words' | 'time'>('words')
   let wordLimit = $state(defaultWordLimit)
@@ -198,8 +244,23 @@
     } catch {
       // Storage can contain malformed data or be unavailable in private browsing.
     }
+    try {
+      const saved = JSON.parse(localStorage.getItem(practiceStorageKey) ?? 'null')
+      practiceMissedLetters = saved?.enabled === true
+      if (saved?.layouts && typeof saved.layouts === 'object' && !Array.isArray(saved.layouts)) {
+        letterHistories = saved.layouts
+      }
+    } catch {
+      // Start with empty history if stored data cannot be read.
+    }
+    reset()
     const timer = window.setInterval(updateClock, 100)
-    return () => window.clearInterval(timer)
+    const storageTimer = window.setInterval(saveLetterHistory, 1000)
+    return () => {
+      window.clearInterval(timer)
+      window.clearInterval(storageTimer)
+      saveLetterHistory()
+    }
   })
 
   function recordWholeSeconds() {
@@ -229,7 +290,13 @@
   }
 
   function reset(focus = false) {
-    nextWords = createPromptGenerator(layouts[layoutName] ?? custom, lesson, caps, punctuation)
+    nextWords = createPromptGenerator(
+      layouts[layoutName] ?? custom,
+      lesson,
+      caps,
+      punctuation,
+      practiceMissedLetters ? activeLetterHistory : undefined,
+    )
     prompt = nextWords(mode === 'words' ? wordLimit : 48)
     wordIndex = 0
     entered = []
@@ -267,6 +334,11 @@
       entered.length < target.length
         ? character === currentKey
         : character === ' ' && wordIsComplete
+    const history = activeLetterHistory ?? {}
+    if (recordLetterAttempt(history, currentKey, correct)) {
+      if (!activeLetterHistory) letterHistories[historyKey] = history
+      historyDirty = true
+    }
     if (correct) hits += 1
     if (character === ' ' && wordIsComplete) {
       accepted += 1
@@ -296,6 +368,7 @@
     if (
       event.defaultPrevented ||
       editor?.open ||
+      letterBreakdownOpen ||
       event.ctrlKey ||
       event.metaKey ||
       event.altKey ||
@@ -366,7 +439,7 @@
   }
 </script>
 
-<svelte:window onkeydown={handleKey} />
+<svelte:window onkeydown={handleKey} onpagehide={saveLetterHistory} />
 
 <header class="site-header">
   <div class="header-inner">
@@ -653,6 +726,84 @@
 
       <div class="options">
         <h2>Options</h2>
+        <div class="missed-letters-option">
+          <label
+            ><Checkbox
+              aria-label="Practice missed letters"
+              checked={practiceMissedLetters}
+              onCheckedChange={value => {
+                practiceMissedLetters = value === true
+                historyDirty = true
+                saveLetterHistory()
+                reset()
+              }}><CheckboxIndicator aria-hidden="true" /></Checkbox
+            > Practice missed letters</label
+          >
+          <Dialog bind:open={letterBreakdownOpen}>
+            <DialogTrigger
+              class="letter-breakdown-trigger"
+              aria-label="Missed letter breakdown"
+              title="Missed letter breakdown"
+            >
+              <svg
+                aria-hidden="true"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M13 5h6v6m0-6-8 8M9 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"
+                />
+              </svg>
+            </DialogTrigger>
+            <DialogBackdrop class="letter-breakdown-backdrop" />
+            <DialogContent class="letter-breakdown">
+              <DialogTitle>Missed letter breakdown</DialogTitle>
+              <DialogDescription>{layoutName} · Last 24 attempts per letter</DialogDescription>
+              {#if letterBreakdown.length}
+                <table aria-label="Missed letters for {layoutName}">
+                  <thead>
+                    <tr>
+                      <th scope="col">Letter</th>
+                      <th scope="col">Miss rate</th>
+                      <th scope="col">Missed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each letterBreakdown as { letter, attempts, misses, missRate } (letter)}
+                      <tr>
+                        <th scope="row">{letter}</th>
+                        <td>
+                          <div class="miss-rate-track" aria-hidden="true">
+                            <div class="miss-rate-fill" style:width={`${missRate * 100}%`}></div>
+                          </div>
+                        </td>
+                        <td>{misses}/{attempts}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              {:else}
+                <p>No letter attempts yet.</p>
+              {/if}
+              <div class="dialog-actions">
+                {#if letterBreakdown.length}
+                  <Button
+                    class="button subtle"
+                    data-agent-confirm="Clears missed-letter history for {layoutName}"
+                    onclick={resetLetterHistory}>Reset letter history</Button
+                  >
+                {/if}
+                <DialogClose class="button primary">Close</DialogClose>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
         <label
           ><Checkbox
             aria-label="Capital letters"
