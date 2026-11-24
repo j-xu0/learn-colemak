@@ -103,11 +103,54 @@ export function lessonKeys(layout: Layout, lesson: number) {
   return { previous, current }
 }
 
+export type LetterHistory = Record<string, string>
+
+const recentAttemptLimit = 24
+const minimumAttempts = 5
+const maximumFocusLetters = 2
+
+function isAttemptHistory(value: unknown): value is string {
+  return typeof value === 'string' && /^[01]{1,24}$/.test(value)
+}
+
+export function recordLetterAttempt(history: LetterHistory, expected: string, correct: boolean) {
+  if (!/^\p{L}$/u.test(expected)) return false
+  const letter = expected.toLowerCase()
+  const previous = history[letter]
+  history[letter] = ((isAttemptHistory(previous) ? previous : '') + (correct ? '1' : '0')).slice(
+    -recentAttemptLimit,
+  )
+  return true
+}
+
+export function summarizeLetterHistory(history: LetterHistory) {
+  return Object.entries(history)
+    .filter(([letter, attempts]) => /^\p{L}\p{M}*$/u.test(letter) && isAttemptHistory(attempts))
+    .map(([letter, attempts]) => {
+      const misses = attempts.length - attempts.replaceAll('0', '').length
+      return { letter, attempts: attempts.length, misses, missRate: misses / attempts.length }
+    })
+    .sort((a, b) => b.missRate - a.missRate || a.letter.localeCompare(b.letter))
+}
+
+export function focusLetters(history: LetterHistory, available: Set<string>) {
+  return new Set(
+    summarizeLetterHistory(history)
+      .filter(
+        ({ letter, attempts, misses }) =>
+          available.has(letter) && attempts >= minimumAttempts && misses > 0,
+      )
+      .slice(0, maximumFocusLetters)
+      .map(({ letter }) => letter),
+  )
+}
+
 export function createPromptGenerator(
   layout: Layout,
   lesson: number,
   caps: boolean,
   punctuation: boolean,
+  history?: LetterHistory,
 ) {
   const keys = new Set([...layout.base.join(''), ...layout.shift.join(''), ' '])
   const { previous, current } = lessonKeys(layout, lesson)
@@ -125,16 +168,34 @@ export function createPromptGenerator(
     ({ word }) => fits(word, allowed) && (lesson >= 6 || [...word].some(char => current.has(char))),
   )
   const letters = [...(current.size ? current : allowed)].filter(char => char !== ' ')
+  const focus =
+    history &&
+    focusLetters(
+      history,
+      new Set(
+        (eligible.length ? eligible.flatMap(({ word }) => [...word]) : letters).map(char =>
+          char.toLowerCase(),
+        ),
+      ),
+    )
+  const emphasis = (word: string) =>
+    focus?.size && [...word.toLowerCase()].some(char => focus.has(char)) ? 2 : 1
   let remaining: string[] = []
   let lastWord: string | undefined
   let position = 0
+  const drillLetters = focus?.size
+    ? [...letters, ...letters.filter(char => focus.has(char.toLowerCase()))]
+    : letters
 
   return (count: number) =>
     Array.from({ length: count }, () => {
       if (!remaining.length && eligible.length) {
         // Random priorities favor common words early in each pass without repeating them.
         remaining = eligible
-          .map(({ word, weight }) => ({ word, priority: -Math.log(1 - Math.random()) / weight }))
+          .map(({ word, weight }) => ({
+            word,
+            priority: -Math.log(1 - Math.random()) / (weight * emphasis(word)),
+          }))
           .sort((a, b) => b.priority - a.priority)
           .map(({ word }) => word)
         const next = remaining.length - 1
@@ -145,9 +206,10 @@ export function createPromptGenerator(
 
       const word =
         remaining.pop() ??
-        Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * letters.length)]).join(
-          '',
-        )
+        Array.from(
+          { length: 3 },
+          () => drillLetters[Math.floor(Math.random() * drillLetters.length)],
+        ).join('')
       lastWord = word
       const slot = position++ % 8
       return slot === 0 ? capitalize(word) : slot === 7 ? punctuate(word, '.') : word

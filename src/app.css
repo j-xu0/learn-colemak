@@ -96,7 +96,7 @@ main {
 
 .workspace {
   display: grid;
-  grid-template-columns: clamp(190px, 17vw, 225px) minmax(0, 1fr);
+  grid-template-columns: clamp(225px, 18vw, 245px) minmax(0, 1fr);
   grid-template-areas: 'controls practice';
   align-items: start;
   gap: clamp(16px, 2.5vw, 30px);
@@ -156,7 +156,8 @@ main {
   font-size: 13px;
 }
 .lesson[data-slot='button']:hover,
-.button.subtle[data-slot='button']:hover {
+.button.subtle[data-slot='button']:hover,
+.letter-breakdown-trigger[data-slot='dialog-trigger']:hover {
   background: var(--selected);
 }
 .lesson[data-slot='button'][aria-pressed='true'] {
@@ -197,6 +198,76 @@ main {
 #typing-help {
   color: var(--muted);
   font-size: 12px;
+}
+
+.missed-letters-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.letter-breakdown-trigger[data-slot='dialog-trigger'] {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+.letter-breakdown[data-slot='dialog-content'] {
+  gap: 14px;
+  box-shadow: none;
+}
+.letter-breakdown [data-slot='dialog-title'] {
+  font-size: 1.5em;
+  font-weight: 700;
+}
+.letter-breakdown [data-slot='dialog-description'] {
+  margin: 0;
+}
+.letter-breakdown .dialog-actions {
+  flex-wrap: wrap;
+}
+.letter-breakdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.letter-breakdown thead {
+  background: var(--section);
+  color: var(--muted);
+}
+.letter-breakdown tbody th {
+  font-family: var(--mono);
+}
+.letter-breakdown :is(th, td) {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: end;
+}
+.letter-breakdown th:first-child {
+  text-align: start;
+}
+.letter-breakdown :is(th, td):nth-child(2) {
+  width: 100%;
+  text-align: start;
+}
+.letter-breakdown td:last-child {
+  white-space: nowrap;
+}
+.miss-rate-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--line);
+}
+.miss-rate-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
 }
 
 .practice {
@@ -462,7 +533,7 @@ kbd.empty {
   border-color: light-dark(#bac8c3, #363636);
 }
 
-.button[data-slot='button'] {
+.button:is([data-slot='button'], [data-slot='dialog-close']) {
   min-height: 36px;
   padding-inline: 10px;
   border-radius: 5px;
@@ -473,11 +544,12 @@ kbd.empty {
   background: var(--paper);
   border: 1px solid var(--edge);
 }
-.button.primary[data-slot='button'] {
+.button.primary:is([data-slot='button'], [data-slot='dialog-close']) {
   background: var(--accent);
   color: var(--on-accent);
 }
-dialog {
+dialog,
+.letter-breakdown[data-slot='dialog-content'] {
   width: min(560px, calc(100% - 26px));
   padding: 22px;
   border: 1px solid var(--line);
@@ -485,14 +557,16 @@ dialog {
   background: var(--paper);
   color: var(--ink);
 }
-dialog::backdrop {
+dialog::backdrop,
+.letter-breakdown-backdrop[data-slot='dialog-backdrop'] {
   background: light-dark(#12252185, #000000b3);
 }
 dialog form {
   display: grid;
   gap: 14px;
 }
-dialog p {
+dialog p,
+.options .letter-breakdown p {
   color: var(--muted);
   font-size: 14px;
 }

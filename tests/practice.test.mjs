@@ -5,9 +5,12 @@ import {
   codes,
   createPrompt,
   createPromptGenerator,
+  focusLetters,
   layouts,
   lessonKeys,
   mappedKey,
+  recordLetterAttempt,
+  summarizeLetterHistory,
   validateLayout,
 } from '../src/practice.ts'
 
@@ -95,4 +98,46 @@ test('timed batches share a word pool and avoid adjacent repeats when it refills
   assert.equal(firstPass.length, eligible.size)
   assert.deepEqual(new Set(firstPass), eligible)
   assert.notEqual(nextWords(1)[0], firstPass.at(-1))
+})
+
+test('letter history keeps recent attempts and combines cases', () => {
+  const history = {}
+  for (let index = 0; index < 5; index++) recordLetterAttempt(history, 'J', false)
+  assert.equal(recordLetterAttempt(history, '.', false), false)
+  assert.equal(recordLetterAttempt(history, ' ', false), false)
+  assert.deepEqual([...focusLetters(history, new Set(['j']))], ['j'])
+  for (let index = 0; index < 24; index++) recordLetterAttempt(history, 'j', true)
+  assert.deepEqual(history, { j: '1'.repeat(24) })
+  assert.equal(focusLetters(history, new Set(['j'])).size, 0)
+})
+
+test('focused prompts prioritize missed letters and preserve lesson eligibility', t => {
+  t.mock.method(Math, 'random', () => 0.5)
+  const layout = layouts.Colemak
+  const baseline = createPromptGenerator(layout, 1, false, false)(10)
+  const generator = createPromptGenerator(layout, 1, false, false, {
+    z: '00000',
+    q: '00000',
+    h: '00001',
+  })
+  const focused = generator(10)
+  assert.ok(
+    focused.filter(word => word.includes('h')).length >
+      baseline.filter(word => word.includes('h')).length,
+  )
+  const { previous, current } = lessonKeys(layout, 1)
+  for (const word of [...focused, ...generator(50)]) {
+    assert.ok([...word].every(key => previous.has(key) || current.has(key)))
+    assert.ok([...word].some(key => current.has(key)))
+  }
+})
+
+test('letter breakdown reports counts and ranks miss rates, including perfect letters', () => {
+  const history = { a: '1111', j: '01010', z: '0', malformed: '00000', x: 'invalid' }
+  assert.deepEqual(summarizeLetterHistory(history), [
+    { letter: 'z', attempts: 1, misses: 1, missRate: 1 },
+    { letter: 'j', attempts: 5, misses: 3, missRate: 0.6 },
+    { letter: 'a', attempts: 4, misses: 0, missRate: 0 },
+  ])
+  assert.deepEqual([...focusLetters(history, new Set(['a', 'j', 'z']))], ['j'])
 })
