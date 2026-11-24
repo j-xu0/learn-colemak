@@ -9,4 +9,5 @@ The upstream version takes the first 5,000 entries of Monkeytype's
 frequency-ordered English 10k list:
 https://github.com/monkeytypegame/monkeytype/pull/7609
 
-Learn Colemak lowercases the entries for practice and filters by lesson keys.
+Learn Colemak preserves the entries' original casing and filters by lesson keys.
+Entries with capital letters are available when Capital letters is enabled.
