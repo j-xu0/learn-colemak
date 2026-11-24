@@ -5,7 +5,6 @@ import {
   codes,
   createPrompt,
   createPromptGenerator,
-  focusLetters,
   layouts,
   lessonKeys,
   mappedKey,
@@ -106,10 +105,8 @@ test('letter history keeps recent attempts and combines cases', () => {
   for (let index = 0; index < 5; index++) recordLetterAttempt(history, 'J', false)
   assert.equal(recordLetterAttempt(history, '.', false), false)
   assert.equal(recordLetterAttempt(history, ' ', false), false)
-  assert.deepEqual([...focusLetters(history, new Set(['j']))], ['j'])
   for (let index = 0; index < 24; index++) recordLetterAttempt(history, 'j', true)
   assert.deepEqual(history, { j: '1'.repeat(24) })
-  assert.equal(focusLetters(history, new Set(['j'])).size, 0)
 })
 
 test('focused prompts prioritize missed letters and preserve lesson eligibility', t => {
@@ -133,6 +130,22 @@ test('focused prompts prioritize missed letters and preserve lesson eligibility'
   }
 })
 
+test('focus scales with severity, includes short histories, and honors manual choices', t => {
+  t.mock.method(Math, 'random', () => 0.5)
+  const prompt = (history, overrides) =>
+    createPromptGenerator(layouts.Colemak, 1, false, false, history, overrides)(10)
+  const baseline = prompt()
+  const mild = prompt({ h: '00111' })
+  const severe = prompt({ h: '00001' })
+
+  assert.ok(mild.indexOf('and') > baseline.indexOf('and'))
+  assert.ok(severe.indexOf('and') > mild.indexOf('and'))
+  assert.deepEqual(prompt({ h: '0' }), baseline)
+  assert.ok(prompt({ h: '0' }, { h: true }).indexOf('and') > baseline.indexOf('and'))
+  assert.deepEqual(prompt({ h: '00001' }, { h: false }), baseline)
+  assert.deepEqual(prompt({ h: '00001', d: '00001' }, { h: false }), prompt({ d: '00001' }))
+})
+
 test('letter breakdown reports counts and ranks miss rates, including perfect letters', () => {
   const history = { a: '1111', j: '01010', z: '0', malformed: '00000', x: 'invalid' }
   assert.deepEqual(summarizeLetterHistory(history), [
@@ -140,7 +153,6 @@ test('letter breakdown reports counts and ranks miss rates, including perfect le
     { letter: 'j', attempts: 5, misses: 3, missRate: 0.6 },
     { letter: 'a', attempts: 4, misses: 0, missRate: 0 },
   ])
-  assert.deepEqual([...focusLetters(history, new Set(['a', 'j', 'z']))], ['j'])
 })
 
 test('the prompt advances one row at a time and keeps the final row at the bottom', () => {

@@ -106,8 +106,6 @@ export function lessonKeys(layout: Layout, lesson: number) {
 export type LetterHistory = Record<string, string>
 
 const recentAttemptLimit = 24
-const minimumAttempts = 5
-const maximumFocusLetters = 2
 
 function isAttemptHistory(value: unknown): value is string {
   return typeof value === 'string' && /^[01]{1,24}$/.test(value)
@@ -133,16 +131,10 @@ export function summarizeLetterHistory(history: LetterHistory) {
     .sort((a, b) => b.missRate - a.missRate || a.letter.localeCompare(b.letter))
 }
 
-export function focusLetters(history: LetterHistory, available: Set<string>) {
-  return new Set(
-    summarizeLetterHistory(history)
-      .filter(
-        ({ letter, attempts, misses }) =>
-          available.has(letter) && attempts >= minimumAttempts && misses > 0,
-      )
-      .slice(0, maximumFocusLetters)
-      .map(({ letter }) => letter),
-  )
+export type LetterFocusOverrides = Record<string, boolean>
+
+export function isLetterFocused(letter: string, misses: number, overrides: LetterFocusOverrides) {
+  return overrides[letter] ?? misses >= 2
 }
 
 export function createPromptGenerator(
@@ -151,6 +143,7 @@ export function createPromptGenerator(
   caps: boolean,
   punctuation: boolean,
   history?: LetterHistory,
+  focusOverrides: LetterFocusOverrides = {},
 ) {
   const keys = new Set([...layout.base.join(''), ...layout.shift.join(''), ' '])
   const { previous, current } = lessonKeys(layout, lesson)
@@ -168,33 +161,39 @@ export function createPromptGenerator(
     ({ word }) => fits(word, allowed) && (lesson >= 6 || [...word].some(char => current.has(char))),
   )
   const letters = [...(current.size ? current : allowed)].filter(char => char !== ' ')
-  const focus =
-    history &&
-    focusLetters(
-      history,
-      new Set(
-        (eligible.length ? eligible.flatMap(({ word }) => [...word]) : letters).map(char =>
-          char.toLowerCase(),
-        ),
-      ),
-    )
-  const emphasis = (word: string) =>
-    focus?.size && [...word.toLowerCase()].some(char => focus.has(char)) ? 2 : 1
+  const focusWeights = new Map(
+    summarizeLetterHistory(history ?? {})
+      .filter(({ letter, misses }) => misses > 0 && isLetterFocused(letter, misses, focusOverrides))
+      // Two prior correct attempts temper the effect of a small sample.
+      .map(({ letter, attempts, misses }) => [letter, (6 * misses) / (attempts + 2)]),
+  )
+  const emphasis = (word: string) => {
+    if (!focusWeights.size) return 1
+    let weight = 1
+    for (const letter of new Set(word.toLowerCase())) weight += focusWeights.get(letter) ?? 0
+    return weight
+  }
+  const weightedWords = eligible.map(({ word, weight }) => ({
+    word,
+    weight: weight * emphasis(word),
+  }))
+  let totalDrillWeight = 0
+  const drillLetters = letters.map(letter => ({
+    letter,
+    end: (totalDrillWeight += emphasis(letter)),
+  }))
   let remaining: string[] = []
   let lastWord: string | undefined
   let position = 0
-  const drillLetters = focus?.size
-    ? [...letters, ...letters.filter(char => focus.has(char.toLowerCase()))]
-    : letters
 
   return (count: number) =>
     Array.from({ length: count }, () => {
-      if (!remaining.length && eligible.length) {
+      if (!remaining.length && weightedWords.length) {
         // Random priorities favor common words early in each pass without repeating them.
-        remaining = eligible
+        remaining = weightedWords
           .map(({ word, weight }) => ({
             word,
-            priority: -Math.log(1 - Math.random()) / (weight * emphasis(word)),
+            priority: -Math.log(1 - Math.random()) / weight,
           }))
           .sort((a, b) => b.priority - a.priority)
           .map(({ word }) => word)
@@ -206,10 +205,10 @@ export function createPromptGenerator(
 
       const word =
         remaining.pop() ??
-        Array.from(
-          { length: 3 },
-          () => drillLetters[Math.floor(Math.random() * drillLetters.length)],
-        ).join('')
+        Array.from({ length: 3 }, () => {
+          const draw = Math.random() * totalDrillWeight
+          return drillLetters.find(({ end }) => draw < end)?.letter
+        }).join('')
       lastWord = word
       const slot = position++ % 8
       return slot === 0 ? capitalize(word) : slot === 7 ? punctuate(word, '.') : word

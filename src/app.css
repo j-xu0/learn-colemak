@@ -187,12 +187,18 @@ main {
   cursor: pointer;
   min-height: 22px;
 }
-.options [data-slot='checkbox'] {
+[data-slot='checkbox'] {
   border: 1px solid var(--edge);
+  border-radius: 5px;
+  background: var(--well);
 }
-.options [data-slot='checkbox'][data-checked] {
-  background: var(--accent);
-  color: var(--on-accent);
+[data-slot='checkbox']:hover {
+  border-color: var(--accent);
+}
+[data-slot='checkbox']:is([data-checked], [data-indeterminate]) {
+  border-color: var(--accent);
+  background: var(--selected);
+  color: var(--accent);
 }
 .options p,
 #typing-help {
@@ -248,10 +254,14 @@ main {
   border-bottom: 1px solid var(--line);
   text-align: end;
 }
-.letter-breakdown th:first-child {
-  text-align: start;
+.letter-breakdown .focus-cell,
+.letter-breakdown thead th:first-child {
+  text-align: center;
 }
-.letter-breakdown :is(th, td):nth-child(2) {
+.letter-breakdown .focus-cell [data-slot='checkbox'] {
+  vertical-align: middle;
+}
+.letter-breakdown .miss-rate-column {
   width: 100%;
   text-align: start;
 }
