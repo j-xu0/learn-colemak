@@ -19,6 +19,7 @@
     layouts,
     lessonKeys,
     mappedKey,
+    promptWindow,
     recordLetterAttempt,
     summarizeLetterHistory,
     validateLayout,
@@ -146,36 +147,12 @@
       measure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
       const gap = parseFloat(style.columnGap)
       const widths = prompt.map(word => measure.measureText(word).width)
-      let start = scroll ? Math.max(0, wordIndex - 2) : 0
-      let end = twoLineEnd(widths, start, promptWidth, gap)
-
-      while (end <= wordIndex && end < widths.length) {
-        start = scroll ? wordIndex : end
-        end = twoLineEnd(widths, start, promptWidth, gap)
-      }
-      return { start, end }
+      return promptWindow(widths, wordIndex, promptWidth, gap, scroll)
     }
     const start = Math.floor(wordIndex / 24) * 24
     return { start, end: start + 24 }
   })
   let visibleWords = $derived(prompt.slice(preview.start, preview.end))
-
-  function twoLineEnd(widths: number[], start: number, available: number, gap: number) {
-    let line = 1
-    let used = 0
-    let end = start
-    while (end < widths.length) {
-      const width = Math.min(widths[end], available)
-      if (used && used + gap + width > available) {
-        if (line === 2) break
-        line += 1
-        used = 0
-      }
-      used = used ? used + gap + width : width
-      end += 1
-    }
-    return end
-  }
 
   let chart = $derived.by(() => {
     const maxSpeed = Math.max(10, ...samples.map(point => point.speed))
