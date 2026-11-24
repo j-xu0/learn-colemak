@@ -234,3 +234,41 @@ export function mappedKey(layout: Layout, code: string, shift: boolean, capsLock
   const upper = [...layout.shift.join('')][index]
   return shift !== (capsLock && base.toUpperCase() === upper && base !== upper) ? upper : base
 }
+
+function lineEnd(widths: number[], start: number, available: number, gap: number) {
+  let used = 0
+  let end = start
+  while (end < widths.length) {
+    const width = Math.min(widths[end], available)
+    const next = used ? used + gap + width : width
+    if (next > available) break
+    used = next
+    end += 1
+  }
+  return end
+}
+
+export function promptWindow(
+  widths: number[],
+  wordIndex: number,
+  available: number,
+  gap: number,
+  scroll: boolean,
+) {
+  let start = scroll ? Math.max(0, wordIndex - 2) : 0
+  let secondLine = lineEnd(widths, start, available, gap)
+  let end = lineEnd(widths, secondLine, available, gap)
+
+  if (scroll && end <= wordIndex && end < widths.length) {
+    start = wordIndex
+    secondLine = lineEnd(widths, start, available, gap)
+    end = lineEnd(widths, secondLine, available, gap)
+  }
+
+  while (!scroll && secondLine <= wordIndex && end < widths.length) {
+    start = secondLine
+    secondLine = end
+    end = lineEnd(widths, secondLine, available, gap)
+  }
+  return { start, end }
+}

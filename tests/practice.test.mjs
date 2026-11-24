@@ -9,6 +9,7 @@ import {
   layouts,
   lessonKeys,
   mappedKey,
+  promptWindow,
   recordLetterAttempt,
   summarizeLetterHistory,
   validateLayout,
@@ -140,4 +141,20 @@ test('letter breakdown reports counts and ranks miss rates, including perfect le
     { letter: 'a', attempts: 4, misses: 0, missRate: 0 },
   ])
   assert.deepEqual([...focusLetters(history, new Set(['a', 'j', 'z']))], ['j'])
+})
+
+test('the prompt advances one row at a time and keeps the final row at the bottom', () => {
+  const widths = [4, 4, 9, 4, 4, 9]
+  const windowAt = index => promptWindow(widths, index, 9, 1, false)
+
+  assert.deepEqual(windowAt(1), { start: 0, end: 3 })
+  assert.deepEqual(windowAt(2), { start: 2, end: 5 })
+  assert.deepEqual(windowAt(3), { start: 3, end: 6 })
+  assert.deepEqual(windowAt(5), { start: 3, end: 6 })
+})
+
+test('per-word scrolling keeps nearby words unless they crowd out the active word', () => {
+  const widths = [9, 9, 4, 4, 9, 9]
+  assert.deepEqual(promptWindow(widths, 1, 9, 1, true), { start: 0, end: 2 })
+  assert.deepEqual(promptWindow(widths, 2, 9, 1, true), { start: 2, end: 5 })
 })
