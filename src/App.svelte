@@ -68,7 +68,19 @@
 
   const storageKey = 'learn-colemak:custom-layout'
   const practiceStorageKey = 'learn-colemak:missed-letters:v1'
+  const balanceStorageKey = 'learn-colemak:balance-letters'
+  let balanceLetters = $state(true)
   let practiceMissedLetters = $state(false)
+
+  function changeLetterBalance(enabled: boolean) {
+    balanceLetters = enabled
+    try {
+      localStorage.setItem(balanceStorageKey, String(enabled))
+    } catch {
+      // Keep using the in-memory setting when storage is unavailable.
+    }
+    reset()
+  }
   let letterHistories = $state<Record<string, LetterHistory>>({})
   let focusOverrides = $state<Record<string, LetterFocusOverrides>>({})
   let historyDirty = false
@@ -260,6 +272,7 @@
 
   onMount(() => {
     try {
+      balanceLetters = localStorage.getItem(balanceStorageKey) !== 'false'
       const savedTheme = localStorage.getItem(themeStorageKey)
       if (savedTheme === 'Light' || savedTheme === 'Dark') applyTheme(savedTheme)
     } catch {
@@ -365,6 +378,7 @@
       punctuation,
       practiceMissedLetters ? activeLetterHistory : undefined,
       activeFocusOverrides,
+      balanceLetters,
     )
     prompt = nextWords(mode === 'words' ? wordLimit : 48)
     wordIndex = 0
@@ -793,6 +807,14 @@
 
       <div class="options">
         <h2>Options</h2>
+        <label
+          ><Checkbox
+            aria-label="Balance letter practice"
+            checked={balanceLetters}
+            onCheckedChange={value => changeLetterBalance(value === true)}
+            ><CheckboxIndicator aria-hidden="true" /></Checkbox
+          > Balance letter practice</label
+        >
         <div class="missed-letters-option">
           <label
             ><Checkbox

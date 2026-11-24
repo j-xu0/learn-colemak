@@ -137,6 +137,70 @@ export function isLetterFocused(letter: string, misses: number, overrides: Lette
   return overrides[letter] ?? misses >= 2
 }
 
+function createBalancedPicker(
+  eligible: typeof words,
+  allowed: Set<string>,
+  current: Set<string>,
+  focusWeights: Map<string, number>,
+) {
+  const byLetter = new Map<string, { word: string; letters: string[]; lastUsed: number }[]>()
+  for (const { word } of eligible) {
+    const candidate = { word, letters: [...word], lastUsed: -Infinity }
+    for (const letter of new Set(candidate.letters)) {
+      const bucket = byLetter.get(letter) ?? []
+      bucket.push(candidate)
+      byLetter.set(letter, bucket)
+    }
+  }
+
+  const counts = new Map<string, number>()
+  const targets = new Map(
+    [...allowed]
+      .filter(key => key !== ' ')
+      .map(key => [key, 1 + (focusWeights.get(key.toLowerCase()) ?? 0)]),
+  )
+  const usage = (key: string) => (counts.get(key) ?? 0) / (targets.get(key) ?? 1)
+  const record = (key: string) => counts.set(key, (counts.get(key) ?? 0) + 1)
+  const leastUsed = (keys: string[]) =>
+    keys.reduce((best, key) => (usage(key) < usage(best) ? key : best))
+  const covered = [...byLetter.keys()]
+  const drillKeys = [...targets.keys()]
+  const newKeys = [...current]
+  let position = 0
+  let lastWord: string | undefined
+
+  return () => {
+    if (!covered.length) {
+      return Array.from({ length: 3 }, (_, index) => {
+        const key = leastUsed(index === 0 && newKeys.length ? newKeys : drillKeys)
+        record(key)
+        return key
+      }).join('')
+    }
+
+    const bucket = byLetter.get(leastUsed(covered))!
+    let best = bucket[0]
+    let bestScore = Infinity
+    for (let i = 0; i < Math.min(24, bucket.length); i++) {
+      const index = Math.floor(Math.random() * bucket.length)
+      const picked = bucket[index]
+      const candidate =
+        picked.word === lastWord && bucket.length > 1 ? bucket[(index + 1) % bucket.length] : picked
+      const score =
+        candidate.letters.reduce((sum, key) => sum + usage(key), 0) / candidate.letters.length +
+        Math.max(0, 8 - (position - candidate.lastUsed))
+      if (score < bestScore) {
+        best = candidate
+        bestScore = score
+      }
+    }
+    for (const key of best.letters) record(key)
+    best.lastUsed = position++
+    lastWord = best.word
+    return best.word
+  }
+}
+
 export function createPromptGenerator(
   layout: Layout,
   lesson: number,
@@ -144,6 +208,7 @@ export function createPromptGenerator(
   punctuation: boolean,
   history?: LetterHistory,
   focusOverrides: LetterFocusOverrides = {},
+  balanceLetters = true,
 ) {
   const keys = new Set([...layout.base.join(''), ...layout.shift.join(''), ' '])
   const { previous, current } = lessonKeys(layout, lesson)
@@ -182,13 +247,16 @@ export function createPromptGenerator(
     letter,
     end: (totalDrillWeight += emphasis(letter)),
   }))
+  const pickBalanced = balanceLetters
+    ? createBalancedPicker(eligible, allowed, current, focusWeights)
+    : undefined
   let remaining: string[] = []
   let lastWord: string | undefined
   let position = 0
 
   return (count: number) =>
     Array.from({ length: count }, () => {
-      if (!remaining.length && weightedWords.length) {
+      if (!pickBalanced && !remaining.length && weightedWords.length) {
         // Random priorities favor common words early in each pass without repeating them.
         remaining = weightedWords
           .map(({ word, weight }) => ({
@@ -204,6 +272,7 @@ export function createPromptGenerator(
       }
 
       const word =
+        pickBalanced?.() ??
         remaining.pop() ??
         Array.from({ length: 3 }, () => {
           const draw = Math.random() * totalDrillWeight
