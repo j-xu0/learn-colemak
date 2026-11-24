@@ -52,6 +52,7 @@
   let elapsed = $state(0)
   let finished = $state(false)
   let samples = $state<{ seconds: number; speed: number }[]>([])
+  let hoveredSample = $state<number | null>(null)
   let typingInput = $state<HTMLInputElement>()
   let promptElement = $state<HTMLDivElement>()
   let promptWidth = $state(0)
@@ -110,14 +111,43 @@
 
   let chart = $derived.by(() => {
     const maxSpeed = Math.max(10, ...samples.map(point => point.speed))
-    const duration = Math.max(1, elapsed)
-    return {
-      maxSpeed,
-      points: [{ seconds: 0, speed: 0 }, ...samples].map(point =>
-        `${30 + point.seconds / duration * 460},${100 - point.speed / maxSpeed * 85}`,
-      ).join(' '),
+    const firstActiveIndex = Math.max(0, samples.findIndex(point => point.speed > 0))
+    const startTime = samples[firstActiveIndex]?.seconds ?? 0
+    const duration = elapsed - startTime
+    const points = samples.slice(firstActiveIndex).map(point => ({
+      ...point,
+      x: duration > 0 ? 30 + (point.seconds - startTime) / duration * 460 : 490,
+      y: 100 - point.speed / maxSpeed * 85,
+    }))
+    const slopes = points.slice(1).map((point, i) =>
+      (point.y - points[i].y) / (point.x - points[i].x),
+    )
+    const tangents = points.map((_, i) => {
+      const before = slopes[i - 1] ?? slopes[i] ?? 0
+      const after = slopes[i] ?? before
+      if (before * after <= 0) return 0
+      return Math.sign(before) * Math.min(Math.abs(before), Math.abs(after))
+    })
+    const first = points[0]
+    let path = first ? `M${first.x} ${first.y}` : ''
+    for (let i = 1; i < points.length; i++) {
+      const previous = points[i - 1]
+      const point = points[i]
+      const offset = (point.x - previous.x) / 3
+      const start = `${previous.x + offset} ${previous.y + tangents[i - 1] * offset}`
+      const end = `${point.x - offset} ${point.y - tangents[i] * offset}`
+      path += `C${start} ${end} ${point.x} ${point.y}`
     }
+    return { maxSpeed, points, path, startTime, duration }
   })
+  let hoveredPoint = $derived(hoveredSample === null ? undefined : chart.points[hoveredSample])
+
+  function inspectChart(event: PointerEvent & { currentTarget: SVGRectElement }) {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const fraction = (event.clientX - bounds.left) / bounds.width
+    const second = Math.min(Math.floor(elapsed), Math.round(chart.startTime + fraction * chart.duration))
+    hoveredSample = Math.max(0, second - chart.startTime)
+  }
 
   onMount(() => {
     try {
@@ -140,8 +170,11 @@
     return () => window.clearInterval(timer)
   })
 
-  function recordSpeed() {
-    samples = [...samples, { seconds: elapsed, speed: elapsed ? Math.round(accepted * 12 / elapsed) : 0 }]
+  function recordWholeSeconds() {
+    const lastSecond = samples.at(-1)?.seconds ?? 0
+    for (let seconds = lastSecond + 1; seconds <= elapsed; seconds++) {
+      samples.push({ seconds, speed: Math.round(accepted * 12 / seconds) })
+    }
   }
 
   function updateClock() {
@@ -152,12 +185,15 @@
       finish()
       return
     }
-    if (elapsed >= (samples.at(-1)?.seconds ?? 0) + 1) recordSpeed()
+    recordWholeSeconds()
   }
 
   function finish() {
+    recordWholeSeconds()
+    const endpoint = { seconds: elapsed, speed: wpm }
+    if (samples.at(-1)?.seconds === elapsed) samples[samples.length - 1] = endpoint
+    else samples.push(endpoint)
     finished = true
-    recordSpeed()
   }
 
   function reset(focus = false) {
@@ -171,6 +207,7 @@
     elapsed = 0
     finished = false
     samples = []
+    hoveredSample = null
     if (focus) void tick().then(() => typingInput?.focus())
   }
 
@@ -297,26 +334,53 @@
         </div>
       </div>
 
-      <dl class="stats" class:complete={finished}>
-        {#if finished}
-          <div><dt>Speed</dt><dd>{wpm} <small>WPM</small></dd></div>
-          <div><dt>Accuracy</dt><dd>{accuracy}<small>%</small></dd></div>
-        {/if}
+      <dl class="stats">
         <div><dt>Elapsed</dt><dd>{Math.floor(elapsed)}<small>s</small></dd></div>
         <div><dt>Words</dt><dd>{wordIndex}{#if mode === 'words'}<small>{' / '}{wordLimit}</small>{/if}</dd></div>
       </dl>
 
       {#if finished}
+        {@const revealStart = chart.points[0].x - 4}
         <section class="results" aria-label="Session results">
           <h3>Session complete</h3>
-          <svg viewBox="0 0 510 125" role="img" aria-label={`Cumulative typing speed over ${Math.round(elapsed)} seconds, ending at ${wpm} words per minute`}>
+          <svg viewBox="0 0 510 125" role="img" aria-label={`Cumulative typing speed over ${Number(elapsed.toFixed(2))} seconds, ending at ${wpm} words per minute`}>
             <path d="M30 15V100H490" fill="none" stroke="currentColor" opacity=".4" />
             <text x="0" y="20">{chart.maxSpeed}</text>
             <text x="15" y="104">0</text>
-            <text x="30" y="121">0s</text>
-            <text x="490" y="121" text-anchor="end">{Math.round(elapsed)}s</text>
-            <polyline points={chart.points} fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" />
+            {#if chart.duration > 0}
+              <text x="30" y="121">{chart.startTime}s</text>
+            {/if}
+            <text x="490" y="121" text-anchor="end">{Number(elapsed.toFixed(2))}s</text>
+            <defs>
+              <clipPath id="speed-reveal">
+                <rect class="speed-reveal" x={revealStart} y="0" width={494 - revealStart} height="104" />
+              </clipPath>
+            </defs>
+            <g clip-path="url(#speed-reveal)">
+              {#if chart.points.length === 1}
+                <circle cx={chart.points[0].x} cy={chart.points[0].y} r="3" fill="var(--accent)" />
+              {:else}
+                <path d={chart.path} fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" />
+              {/if}
+            </g>
+            {#if hoveredPoint}
+              {@const tooltipX = Math.max(76, Math.min(444, hoveredPoint.x))}
+              {@const tooltipY = hoveredPoint.y < 44 ? hoveredPoint.y + 10 : hoveredPoint.y - 34}
+              <g pointer-events="none" aria-hidden="true">
+                <path d={`M${hoveredPoint.x} 15V100`} stroke="currentColor" opacity=".45" stroke-dasharray="3 3" />
+                <circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="4" fill="var(--accent)" stroke="var(--paper)" stroke-width="1.5" />
+                <rect x={tooltipX - 46} y={tooltipY} width="92" height="24" rx="4" fill="var(--ink)" />
+                <text x={tooltipX} y={tooltipY + 12} text-anchor="middle" dominant-baseline="central" style="fill: var(--paper)">{Number(hoveredPoint.seconds.toFixed(2))}s · {hoveredPoint.speed} WPM</text>
+              </g>
+            {/if}
+            <rect x="30" y="15" width="460" height="85" fill="transparent" aria-hidden="true"
+              onpointermove={inspectChart} onpointerdown={inspectChart}
+              onpointerleave={() => { hoveredSample = null }} />
           </svg>
+          <dl class="stats result-stats">
+            <div><dt>Speed</dt><dd>{wpm} <small>WPM</small></dd></div>
+            <div><dt>Accuracy</dt><dd>{accuracy}<small>%</small></dd></div>
+          </dl>
         </section>
       {:else}
         <div class="typing">
