@@ -328,9 +328,13 @@
             {#each visibleWords as word, i (preview.start + i)}
               <span class="word" class:done={preview.start + i < wordIndex} class:active={preview.start + i === wordIndex}>
                 {#if preview.start + i === wordIndex}
-                  {#each [...word] as key, index (index)}<span class:correct={entered[index] === key} class:wrong={entered[index] !== undefined && entered[index] !== key} class:caret={index === entered.length}>{key}</span>{/each}
-                  {#each entered.slice(target.length) as key, index (index)}<span class="wrong">{key === ' ' ? '␣' : key}</span>{/each}
-                  {#if entered.length >= target.length}<span class="end-caret"></span>{/if}
+                  {#each [...word] as key, index (index)}<span
+                    class:correct={entered[index] === key}
+                    class:wrong={entered[index] !== undefined && entered[index] !== key}
+                    class:caret={index === entered.length}
+                  >{key}</span>{/each}{#each entered.slice(target.length) as key, index (index)}<span
+                    class="wrong"
+                  >{key === ' ' ? '␣' : key}</span>{/each}{#if entered.length >= target.length}<span class="end-caret"></span>{/if}
                 {:else}{word}{/if}
               </span>
             {/each}

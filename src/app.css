@@ -165,24 +165,18 @@ h1, h2, h3, p, dl, dd { margin: 0; }
   text-decoration: underline;
   text-underline-offset: .16em;
 }
-.word .caret {
+.word .caret, .end-caret::after {
   color: var(--on-accent);
   background: var(--accent);
   border-radius: 2px;
 }
 .end-caret {
-  position: relative;
+  /* Paint the caret in the inter-word gap without widening the word. */
   display: inline-block;
   width: 0;
-  height: 1em;
-  vertical-align: -.12em;
 }
 .end-caret::after {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: var(--accent);
+  content: "\00a0";
 }
 #typing-help { margin-top: 10px; }
 .results { grid-template-rows: auto 1fr; }
