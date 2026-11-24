@@ -133,6 +133,7 @@
   let editorError = $state('')
 
   let target = $derived([...(prompt[wordIndex] ?? '')])
+  let extraInput = $derived(entered.slice(target.length).join('').replaceAll(' ', '␣'))
   let currentKey = $derived(entered.length < target.length ? target[entered.length] : ' ')
   let keyboard = $derived([...layout.base.join('')])
   let shifted = $derived([...layout.shift.join('')])
@@ -611,15 +612,18 @@
                       class:correct={entered[index] === key}
                       class:wrong={entered[index] !== undefined && entered[index] !== key}
                       class:caret={index === entered.length}>{key}</span
-                    >{/each}{#each entered.slice(target.length) as key, index (index)}<span
-                      class="wrong">{key === ' ' ? '␣' : key}</span
                     >{/each}{#if entered.length >= target.length}<span class="end-caret"
                     ></span>{/if}
                 {:else}{word}{/if}
               </span>
             {/each}
           </div>
-          <p id="typing-help">{started === null ? 'Type to begin.' : 'Press Esc to restart.'}</p>
+          <div class="typing-footer">
+            <p id="typing-help">Press Esc to restart.</p>
+            {#if extraInput}
+              <p class="extra-input">Extra keys <span>{extraInput}</span></p>
+            {/if}
+          </div>
         </div>
       {/if}
 
