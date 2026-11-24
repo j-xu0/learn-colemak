@@ -1,6 +1,6 @@
 English 5k word list from Monkeytype (Miodec and contributors).
-Distributed under the GNU Affero General Public License, version 3.
-The license text is in monkeytype-AGPL-3.0.txt.
+Distributed under the GNU General Public License, version 3.
+The license text is in monkeytype-GPL-3.0.txt.
 
 Unmodified source file at commit a4a4463bbb632b25b80f43a3c83e1a3d8345d656:
 https://github.com/monkeytypegame/monkeytype/blob/a4a4463bbb632b25b80f43a3c83e1a3d8345d656/frontend/static/languages/english_5k.json

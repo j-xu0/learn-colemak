@@ -48,4 +48,13 @@ export default writable(0)
 
 ## Practice word list
 
-Word drills use [Monkeytype English 5k](https://github.com/monkeytypegame/monkeytype/blob/a4a4463bbb632b25b80f43a3c83e1a3d8345d656/frontend/static/languages/english_5k.json). See the [source notice](public/licenses/monkeytype-english-5k.txt) and [AGPL-3.0 license](public/licenses/monkeytype-AGPL-3.0.txt).
+Word drills use [Monkeytype English 5k](https://github.com/monkeytypegame/monkeytype/blob/a4a4463bbb632b25b80f43a3c83e1a3d8345d656/frontend/static/languages/english_5k.json). See the [source notice](public/licenses/monkeytype-english-5k.txt) and [GPL-3.0 license](public/licenses/monkeytype-GPL-3.0.txt).
+
+## License
+
+Learn Colemak is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+The bundled Monkeytype word list retains its upstream GPLv3 terms. The bundled
+frontend packages retain their [Apache-2.0 and MIT notices](public/licenses/frontend-dependencies.txt).
+
+Build deployments from a clean checkout. Tag each deployed commit so users can
+find the matching source version in the repository linked from the site footer.
