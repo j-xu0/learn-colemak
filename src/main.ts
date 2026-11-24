@@ -1,5 +1,5 @@
 import { mount } from 'svelte'
-import "@ui-sdk/core/web.css"
+import '@ui-sdk/core/web.css'
 import './app.css'
 import './agent'
 import App from './App.svelte'

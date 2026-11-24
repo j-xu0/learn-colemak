@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "svelte": true,
+  "semi": false,
+  "singleQuote": true,
+  "arrowParens": "avoid",
+  "ignorePatterns": [".agents/**", "src/data/english_5k.json", "skills-lock.json"]
+}

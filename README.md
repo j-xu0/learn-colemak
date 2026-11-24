@@ -2,6 +2,13 @@
 
 This template should help get you started developing with Svelte and TypeScript in Vite.
 
+## Code checks
+
+- `npm run fmt` formats the project, including Svelte components.
+- `npm run fmt:check` checks formatting without writing changes.
+- `npm run lint` runs Oxlint on JavaScript, TypeScript, and Svelte script blocks.
+- `npm run check` runs Svelte and TypeScript diagnostics.
+
 ## Recommended IDE Setup
 
 [VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).

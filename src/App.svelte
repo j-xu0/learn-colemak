@@ -3,15 +3,36 @@
   import { Button } from '@ui-sdk/svelte/button'
   import { Checkbox, CheckboxIndicator } from '@ui-sdk/svelte/checkbox'
   import PracticeSelect from './PracticeSelect.svelte'
-  import { codes, createPromptGenerator, keyRows, layouts, lessonKeys, mappedKey, validateLayout, type Layout } from './practice'
+  import {
+    codes,
+    createPromptGenerator,
+    keyRows,
+    layouts,
+    lessonKeys,
+    mappedKey,
+    validateLayout,
+    type Layout,
+  } from './practice'
 
-  const lessons = ['Lesson 1', 'Lesson 2', 'Lesson 3', 'Lesson 4', 'Lesson 5', 'Lesson 6', 'All Words']
-  const options = (values: (number | string)[]) => values.map(value => ({ value: String(value), label: String(value) }))
+  const lessons = [
+    'Lesson 1',
+    'Lesson 2',
+    'Lesson 3',
+    'Lesson 4',
+    'Lesson 5',
+    'Lesson 6',
+    'All Words',
+  ]
+  const options = (values: (number | string)[]) =>
+    values.map(value => ({ value: String(value), label: String(value) }))
   const layoutOptions = options([...Object.keys(layouts), 'Custom'])
   const defaultWordLimit = 50
   const wordOptions = options([10, 25, 50, 100])
   const timeOptions = options([15, 30, 60, 120])
-  const sessionOptions = [{ value: 'words', label: 'Word count' }, { value: 'time', label: 'Timed' }]
+  const sessionOptions = [
+    { value: 'words', label: 'Word count' },
+    { value: 'time', label: 'Timed' },
+  ]
   const themeOptions = options(['System', 'Light', 'Dark'])
   const themeStorageKey = 'learn-colemak:theme'
   let theme = $state('System')
@@ -70,8 +91,8 @@
   let shifted = $derived([...layout.shift.join('')])
   let lessonGroups = $derived(lessonKeys(layout, lesson))
   let promptSymbols = $derived(new Set([...prompt.join('')].filter(key => /[^\p{L}]/u.test(key))))
-  let wpm = $derived(elapsed > 0 ? Math.round(accepted * 12 / elapsed) : 0)
-  let accuracy = $derived(attempts ? Math.round(hits * 100 / attempts) : 100)
+  let wpm = $derived(elapsed > 0 ? Math.round((accepted * 12) / elapsed) : 0)
+  let accuracy = $derived(attempts ? Math.round((hits * 100) / attempts) : 100)
   let preview = $derived.by(() => {
     const style = promptElement && getComputedStyle(promptElement)
     const measure = wordMeasure
@@ -112,17 +133,20 @@
 
   let chart = $derived.by(() => {
     const maxSpeed = Math.max(10, ...samples.map(point => point.speed))
-    const firstActiveIndex = Math.max(0, samples.findIndex(point => point.speed > 0))
+    const firstActiveIndex = Math.max(
+      0,
+      samples.findIndex(point => point.speed > 0),
+    )
     const startTime = samples[firstActiveIndex]?.seconds ?? 0
     const duration = elapsed - startTime
     const points = samples.slice(firstActiveIndex).map(point => ({
       ...point,
-      x: duration > 0 ? 30 + (point.seconds - startTime) / duration * 460 : 490,
-      y: 100 - point.speed / maxSpeed * 85,
+      x: duration > 0 ? 30 + ((point.seconds - startTime) / duration) * 460 : 490,
+      y: 100 - (point.speed / maxSpeed) * 85,
     }))
-    const slopes = points.slice(1).map((point, i) =>
-      (point.y - points[i].y) / (point.x - points[i].x),
-    )
+    const slopes = points
+      .slice(1)
+      .map((point, i) => (point.y - points[i].y) / (point.x - points[i].x))
     const tangents = points.map((_, i) => {
       const before = slopes[i - 1] ?? slopes[i] ?? 0
       const after = slopes[i] ?? before
@@ -146,7 +170,10 @@
   function inspectChart(event: PointerEvent & { currentTarget: SVGRectElement }) {
     const bounds = event.currentTarget.getBoundingClientRect()
     const fraction = (event.clientX - bounds.left) / bounds.width
-    const second = Math.min(Math.floor(elapsed), Math.round(chart.startTime + fraction * chart.duration))
+    const second = Math.min(
+      Math.floor(elapsed),
+      Math.round(chart.startTime + fraction * chart.duration),
+    )
     hoveredSample = Math.max(0, second - chart.startTime)
   }
 
@@ -161,7 +188,11 @@
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
       if (saved) {
-        const parsed = validateLayout(saved.base.join('\n'), saved.shift.join('\n'), saved.groups.join(' '))
+        const parsed = validateLayout(
+          saved.base.join('\n'),
+          saved.shift.join('\n'),
+          saved.groups.join(' '),
+        )
         if (typeof parsed !== 'string') custom = parsed
       }
     } catch {
@@ -174,7 +205,7 @@
   function recordWholeSeconds() {
     const lastSecond = samples.at(-1)?.seconds ?? 0
     for (let seconds = lastSecond + 1; seconds <= elapsed; seconds++) {
-      samples.push({ seconds, speed: Math.round(accepted * 12 / seconds) })
+      samples.push({ seconds, speed: Math.round((accepted * 12) / seconds) })
     }
   }
 
@@ -230,8 +261,12 @@
     if (finished) return
     if (started === null) started = performance.now()
     attempts += 1
-    const wordIsComplete = entered.length === target.length && entered.every((key, i) => key === target[i])
-    const correct = entered.length < target.length ? character === currentKey : character === ' ' && wordIsComplete
+    const wordIsComplete =
+      entered.length === target.length && entered.every((key, i) => key === target[i])
+    const correct =
+      entered.length < target.length
+        ? character === currentKey
+        : character === ' ' && wordIsComplete
     if (correct) hits += 1
     if (character === ' ' && wordIsComplete) {
       accepted += 1
@@ -241,7 +276,13 @@
     if (entered.length >= target.length + 8) return
     entered = [...entered, character]
     if (correct && entered.length <= target.length) accepted += 1
-    if (mode === 'words' && wordIndex === prompt.length - 1 && entered.length === target.length && entered.every((key, i) => key === target[i])) advance()
+    if (
+      mode === 'words' &&
+      wordIndex === prompt.length - 1 &&
+      entered.length === target.length &&
+      entered.every((key, i) => key === target[i])
+    )
+      advance()
   }
 
   function backspace() {
@@ -252,9 +293,23 @@
   }
 
   function handleKey(event: KeyboardEvent) {
-    if (event.defaultPrevented || editor?.open || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return
+    if (
+      event.defaultPrevented ||
+      editor?.open ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.isComposing
+    )
+      return
     const element = event.target instanceof Element ? event.target : null
-    if (element !== typingInput && element?.closest('input, textarea, select, [contenteditable], [role="listbox"], [aria-expanded="true"]')) return
+    if (
+      element !== typingInput &&
+      element?.closest(
+        'input, textarea, select, [contenteditable], [role="listbox"], [aria-expanded="true"]',
+      )
+    )
+      return
     if (event.key === ' ' && element?.closest('button, a[href]')) return
 
     if (event.key === 'Escape') {
@@ -266,7 +321,10 @@
     } else if (!finished && [...event.key].length === 1) {
       event.preventDefault()
       if (element?.closest('button, a[href]')) typingInput?.focus({ preventScroll: true })
-      const character = remap ? mappedKey(layout, event.code, event.shiftKey, event.getModifierState('CapsLock')) ?? event.key : event.key
+      const character = remap
+        ? (mappedKey(layout, event.code, event.shiftKey, event.getModifierState('CapsLock')) ??
+          event.key)
+        : event.key
       typeCharacter(character)
     }
   }
@@ -275,7 +333,8 @@
     const input = event.currentTarget as HTMLInputElement
     const change = event as InputEvent
     if (change.inputType === 'deleteContentBackward') backspace()
-    else if (change.inputType !== 'insertFromPaste') for (const character of input.value) typeCharacter(character)
+    else if (change.inputType !== 'insertFromPaste')
+      for (const character of input.value) typeCharacter(character)
     input.value = ''
   }
 
@@ -324,28 +383,61 @@
     <div class="practice">
       <div class="practice-header">
         <div class="session-controls">
-          <PracticeSelect label="Session" items={sessionOptions} value={mode}
-            change={(value) => { mode = value === 'time' ? 'time' : 'words'; reset() }} />
+          <PracticeSelect
+            label="Session"
+            items={sessionOptions}
+            value={mode}
+            change={value => {
+              mode = value === 'time' ? 'time' : 'words'
+              reset()
+            }}
+          />
           {#if mode === 'words'}
-            <PracticeSelect label="Words" items={wordOptions} value={String(wordLimit)}
-              change={(value) => { wordLimit = Number(value); reset() }} />
+            <PracticeSelect
+              label="Words"
+              items={wordOptions}
+              value={String(wordLimit)}
+              change={value => {
+                wordLimit = Number(value)
+                reset()
+              }}
+            />
           {:else}
-            <PracticeSelect label="Seconds" items={timeOptions} value={String(timeLimit)}
-              change={(value) => { timeLimit = Number(value); reset() }} />
+            <PracticeSelect
+              label="Seconds"
+              items={timeOptions}
+              value={String(timeLimit)}
+              change={value => {
+                timeLimit = Number(value)
+                reset()
+              }}
+            />
           {/if}
         </div>
       </div>
 
       <dl class="stats">
-        <div><dt>Elapsed</dt><dd>{Math.floor(elapsed)}<small>s</small></dd></div>
-        <div><dt>Words</dt><dd>{wordIndex}{#if mode === 'words'}<small>{' / '}{wordLimit}</small>{/if}</dd></div>
+        <div>
+          <dt>Elapsed</dt>
+          <dd>{Math.floor(elapsed)}<small>s</small></dd>
+        </div>
+        <div>
+          <dt>Words</dt>
+          <dd>
+            {wordIndex}{#if mode === 'words'}<small>{' / '}{wordLimit}</small>{/if}
+          </dd>
+        </div>
       </dl>
 
       {#if finished}
         {@const revealStart = chart.points[0].x - 4}
         <section class="results" aria-label="Session results">
           <h3>Session complete</h3>
-          <svg viewBox="0 0 510 125" role="img" aria-label={`Cumulative typing speed over ${Number(elapsed.toFixed(2))} seconds, ending at ${wpm} words per minute`}>
+          <svg
+            viewBox="0 0 510 125"
+            role="img"
+            aria-label={`Cumulative typing speed over ${Number(elapsed.toFixed(2))} seconds, ending at ${wpm} words per minute`}
+          >
             <path d="M30 15V100H490" fill="none" stroke="currentColor" opacity=".4" />
             <text x="0" y="20">{chart.maxSpeed}</text>
             <text x="15" y="104">0</text>
@@ -355,52 +447,124 @@
             <text x="490" y="121" text-anchor="end">{Number(elapsed.toFixed(2))}s</text>
             <defs>
               <clipPath id="speed-reveal">
-                <rect class="speed-reveal" x={revealStart} y="0" width={494 - revealStart} height="104" />
+                <rect
+                  class="speed-reveal"
+                  x={revealStart}
+                  y="0"
+                  width={494 - revealStart}
+                  height="104"
+                />
               </clipPath>
             </defs>
             <g clip-path="url(#speed-reveal)">
               {#if chart.points.length === 1}
                 <circle cx={chart.points[0].x} cy={chart.points[0].y} r="3" fill="var(--accent)" />
               {:else}
-                <path d={chart.path} fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" />
+                <path
+                  d={chart.path}
+                  fill="none"
+                  stroke="var(--accent)"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                />
               {/if}
             </g>
             {#if hoveredPoint}
               {@const tooltipX = Math.max(76, Math.min(444, hoveredPoint.x))}
               {@const tooltipY = hoveredPoint.y < 44 ? hoveredPoint.y + 10 : hoveredPoint.y - 34}
               <g pointer-events="none" aria-hidden="true">
-                <path d={`M${hoveredPoint.x} 15V100`} stroke="currentColor" opacity=".45" stroke-dasharray="3 3" />
-                <circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="4" fill="var(--accent)" stroke="var(--paper)" stroke-width="1.5" />
-                <rect x={tooltipX - 46} y={tooltipY} width="92" height="24" rx="4" fill="var(--ink)" />
-                <text x={tooltipX} y={tooltipY + 12} text-anchor="middle" dominant-baseline="central" style="fill: var(--paper)">{Number(hoveredPoint.seconds.toFixed(2))}s · {hoveredPoint.speed} WPM</text>
+                <path
+                  d={`M${hoveredPoint.x} 15V100`}
+                  stroke="currentColor"
+                  opacity=".45"
+                  stroke-dasharray="3 3"
+                />
+                <circle
+                  cx={hoveredPoint.x}
+                  cy={hoveredPoint.y}
+                  r="4"
+                  fill="var(--accent)"
+                  stroke="var(--paper)"
+                  stroke-width="1.5"
+                />
+                <rect
+                  x={tooltipX - 46}
+                  y={tooltipY}
+                  width="92"
+                  height="24"
+                  rx="4"
+                  fill="var(--ink)"
+                />
+                <text
+                  x={tooltipX}
+                  y={tooltipY + 12}
+                  text-anchor="middle"
+                  dominant-baseline="central"
+                  style="fill: var(--paper)"
+                  >{Number(hoveredPoint.seconds.toFixed(2))}s · {hoveredPoint.speed} WPM</text
+                >
               </g>
             {/if}
-            <rect x="30" y="15" width="460" height="85" fill="transparent" aria-hidden="true"
-              onpointermove={inspectChart} onpointerdown={inspectChart}
-              onpointerleave={() => { hoveredSample = null }} />
+            <rect
+              x="30"
+              y="15"
+              width="460"
+              height="85"
+              fill="transparent"
+              aria-hidden="true"
+              onpointermove={inspectChart}
+              onpointerdown={inspectChart}
+              onpointerleave={() => {
+                hoveredSample = null
+              }}
+            />
           </svg>
           <dl class="stats result-stats">
-            <div><dt>Speed</dt><dd>{wpm} <small>WPM</small></dd></div>
-            <div><dt>Accuracy</dt><dd>{accuracy}<small>%</small></dd></div>
+            <div>
+              <dt>Speed</dt>
+              <dd>{wpm} <small>WPM</small></dd>
+            </div>
+            <div>
+              <dt>Accuracy</dt>
+              <dd>{accuracy}<small>%</small></dd>
+            </div>
           </dl>
         </section>
       {:else}
         <div class="typing">
           <label for="typing-input" class="sr-only">Type the practice prompt</label>
-          <input id="typing-input" class="typing-input" bind:this={typingInput} oninput={handleInput}
-            aria-describedby="prompt typing-help" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          <input
+            id="typing-input"
+            class="typing-input"
+            bind:this={typingInput}
+            oninput={handleInput}
+            aria-describedby="prompt typing-help"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
           <span class="sr-only" id="prompt">{visibleWords.join(' ')}</span>
-          <div class="prompt" bind:this={promptElement} bind:clientWidth={promptWidth} aria-hidden="true">
+          <div
+            class="prompt"
+            bind:this={promptElement}
+            bind:clientWidth={promptWidth}
+            aria-hidden="true"
+          >
             {#each visibleWords as word, i (preview.start + i)}
-              <span class="word" class:done={preview.start + i < wordIndex} class:active={preview.start + i === wordIndex}>
+              <span
+                class="word"
+                class:done={preview.start + i < wordIndex}
+                class:active={preview.start + i === wordIndex}
+              >
                 {#if preview.start + i === wordIndex}
                   {#each [...word] as key, index (index)}<span
-                    class:correct={entered[index] === key}
-                    class:wrong={entered[index] !== undefined && entered[index] !== key}
-                    class:caret={index === entered.length}
-                  >{key}</span>{/each}{#each entered.slice(target.length) as key, index (index)}<span
-                    class="wrong"
-                  >{key === ' ' ? '␣' : key}</span>{/each}{#if entered.length >= target.length}<span class="end-caret"></span>{/if}
+                      class:correct={entered[index] === key}
+                      class:wrong={entered[index] !== undefined && entered[index] !== key}
+                      class:caret={index === entered.length}>{key}</span
+                    >{/each}{#each entered.slice(target.length) as key, index (index)}<span
+                      class="wrong">{key === ' ' ? '␣' : key}</span
+                    >{/each}{#if entered.length >= target.length}<span class="end-caret"
+                    ></span>{/if}
                 {:else}{word}{/if}
               </span>
             {/each}
@@ -410,21 +574,38 @@
       {/if}
 
       <div class="keyboard-area" aria-label="Keyboard guide">
-        <div class="keyboard-heading"><h3>Keyboard guide</h3><Button class="button subtle" onclick={() => reset(true)}>Restart</Button></div>
+        <div class="keyboard-heading">
+          <h3>Keyboard guide</h3>
+          <Button class="button subtle" onclick={() => reset(true)}>Restart</Button>
+        </div>
         <div class="keyboard" aria-hidden="true">
           {#each keyRows as row, rowIndex (row)}
-            <div class="key-row" class:alpha={rowIndex === 1} class:home={rowIndex === 2} class:bottom={rowIndex === 3}>
+            <div
+              class="key-row"
+              class:alpha={rowIndex === 1}
+              class:home={rowIndex === 2}
+              class:bottom={rowIndex === 3}
+            >
               {#if rowIndex > 0}<kbd class="empty leading"></kbd>{/if}
               {#each row as code (code)}
                 {@const index = codes.indexOf(code)}
                 {@const key = keyboard[index]}
                 {@const shiftedKey = shifted[index]}
                 {@const newLabel = [key, shiftedKey].find(value => lessonGroups.current.has(value))}
-                {@const earlierLabel = [key, shiftedKey].find(value => lessonGroups.previous.has(value))}
+                {@const earlierLabel = [key, shiftedKey].find(value =>
+                  lessonGroups.previous.has(value),
+                )}
                 {@const symbol = [key, shiftedKey].find(value => promptSymbols.has(value))}
-                {@const label = lesson >= 6 ? [key, shiftedKey].find(value => /\p{L}/u.test(value)) : newLabel ?? earlierLabel ?? symbol}
-                <kbd class:current={!!newLabel} class:previous={lesson < 6 && !newLabel && !!earlierLabel}
-                  class:empty={!label} class:anchor={!!label && (code === 'KeyF' || code === 'KeyJ')}>{label ?? ''}</kbd>
+                {@const label =
+                  lesson >= 6
+                    ? [key, shiftedKey].find(value => /\p{L}/u.test(value))
+                    : (newLabel ?? earlierLabel ?? symbol)}
+                <kbd
+                  class:current={!!newLabel}
+                  class:previous={lesson < 6 && !newLabel && !!earlierLabel}
+                  class:empty={!label}
+                  class:anchor={!!label && (code === 'KeyF' || code === 'KeyJ')}>{label ?? ''}</kbd
+                >
               {/each}
               {#if rowIndex !== 1}<kbd class="empty trailing"></kbd>{/if}
             </div>
@@ -432,20 +613,37 @@
           <div class="key-row space-row">
             <kbd class="empty"></kbd><kbd class="empty"></kbd><kbd class="empty"></kbd>
             <kbd class="spacebar" class:empty={lesson >= 6}>{lesson < 6 ? 'space' : ''}</kbd>
-            <kbd class="empty"></kbd><kbd class="empty"></kbd><kbd class="empty"></kbd><kbd class="empty"></kbd>
+            <kbd class="empty"></kbd><kbd class="empty"></kbd><kbd class="empty"></kbd><kbd
+              class="empty"
+            ></kbd>
           </div>
         </div>
       </div>
     </div>
     <aside class="controls" aria-label="Practice settings">
-      <PracticeSelect label="Keyboard layout" items={layoutOptions} value={layoutName} optionsClass="layout-select-options"
-        change={(value) => { layoutName = value; reset() }} />
+      <PracticeSelect
+        label="Keyboard layout"
+        items={layoutOptions}
+        value={layoutName}
+        optionsClass="layout-select-options"
+        change={value => {
+          layoutName = value
+          reset()
+        }}
+      />
 
       <nav aria-label="Lessons">
         <h2>Lessons</h2>
         <div class="lessons">
           {#each lessons as label, i (label)}
-            <Button class="lesson" aria-pressed={lesson === i} onclick={() => { lesson = i; reset() }}>
+            <Button
+              class="lesson"
+              aria-pressed={lesson === i}
+              onclick={() => {
+                lesson = i
+                reset()
+              }}
+            >
               <span>{label}</span>
               {#if i < 6}<small>{[...layout.groups[i]].join(' ')}</small>{/if}
             </Button>
@@ -455,29 +653,71 @@
 
       <div class="options">
         <h2>Options</h2>
-        <label><Checkbox aria-label="Capital letters" checked={caps} onCheckedChange={(value) => { caps = value === true; reset() }}><CheckboxIndicator aria-hidden="true" /></Checkbox> Capital letters</label>
-        <label><Checkbox aria-label="Punctuation" checked={punctuation} onCheckedChange={(value) => { punctuation = value === true; reset() }}><CheckboxIndicator aria-hidden="true" /></Checkbox> Punctuation</label>
-        <label><Checkbox aria-label="Scrolling prompt" bind:checked={scroll}><CheckboxIndicator aria-hidden="true" /></Checkbox> Scrolling prompt</label>
-        <label><Checkbox aria-label="Remap physical keys" bind:checked={remap}><CheckboxIndicator aria-hidden="true" /></Checkbox> Remap physical keys</label>
+        <label
+          ><Checkbox
+            aria-label="Capital letters"
+            checked={caps}
+            onCheckedChange={value => {
+              caps = value === true
+              reset()
+            }}><CheckboxIndicator aria-hidden="true" /></Checkbox
+          > Capital letters</label
+        >
+        <label
+          ><Checkbox
+            aria-label="Punctuation"
+            checked={punctuation}
+            onCheckedChange={value => {
+              punctuation = value === true
+              reset()
+            }}><CheckboxIndicator aria-hidden="true" /></Checkbox
+          > Punctuation</label
+        >
+        <label
+          ><Checkbox aria-label="Scrolling prompt" bind:checked={scroll}
+            ><CheckboxIndicator aria-hidden="true" /></Checkbox
+          > Scrolling prompt</label
+        >
+        <label
+          ><Checkbox aria-label="Remap physical keys" bind:checked={remap}
+            ><CheckboxIndicator aria-hidden="true" /></Checkbox
+          > Remap physical keys</label
+        >
         <p>Turn off if your system already uses the selected layout.</p>
       </div>
     </aside>
-
   </section>
 </main>
 
 <dialog bind:this={editor} aria-labelledby="editor-title">
-  <form onsubmit={(event) => { event.preventDefault(); saveLayout() }}>
+  <form
+    onsubmit={event => {
+      event.preventDefault()
+      saveLayout()
+    }}
+  >
     <h2 id="editor-title">Custom keyboard layout</h2>
-    <p>Enter the keys in physical order, from the number row down. Each layer uses four rows of 13, 13, 11, and 10 keys.</p>
+    <p>
+      Enter the keys in physical order, from the number row down. Each layer uses four rows of 13,
+      13, 11, and 10 keys.
+    </p>
     <div class="editor-layers">
-      <label class="field">Base keys <textarea rows="4" bind:value={draftBase} spellcheck="false"></textarea></label>
-      <label class="field">Shifted keys <textarea rows="4" bind:value={draftShift} spellcheck="false"></textarea></label>
+      <label class="field"
+        >Base keys <textarea rows="4" bind:value={draftBase} spellcheck="false"></textarea></label
+      >
+      <label class="field"
+        >Shifted keys <textarea rows="4" bind:value={draftShift} spellcheck="false"
+        ></textarea></label
+      >
     </div>
-    <label class="field">Lesson groups
+    <label class="field"
+      >Lesson groups
       <input bind:value={draftGroups} spellcheck="false" aria-describedby="group-help" />
     </label>
-    <p id="group-help">Separate the six groups with spaces. Each lesson adds its group to the keys from earlier lessons.</p>
+    <p id="group-help">
+      Separate the six groups with spaces. Each lesson adds its group to the keys from earlier
+      lessons.
+    </p>
     {#if editorError}<p class="error" role="alert">{editorError}</p>{/if}
     <div class="dialog-actions">
       <Button class="button subtle" onclick={() => editor.close()}>Discard</Button>
